@@ -19,12 +19,11 @@ services:
         sync: false # Set in Render Dashboard
 
   # Frontend Static Site
-  - type: web
+  - type: static
     name: pbi-qa-frontend
-    runtime: static
+    rootDir: frontend
     buildCommand: npm install && npm run build
     publishDir: dist
-    staticPublishPath: frontend
     routes:
       # Proxy api routes to the backend
       - type: rewrite

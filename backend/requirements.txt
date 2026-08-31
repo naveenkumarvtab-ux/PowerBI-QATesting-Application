@@ -1,0 +1,12 @@
+Flask
+Flask-CORS
+SQLAlchemy
+requests
+msal
+playwright
+reportlab
+pandas
+openpyxl
+python-dotenv
+gunicorn
+pbixray

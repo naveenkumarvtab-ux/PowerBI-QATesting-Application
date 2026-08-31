@@ -1,0 +1,28 @@
+# Python venv
+backend/venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Node modules & builds
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# Databases
+backend/pbi_qa.db
+*.db
+*.sqlite
+
+# Uploads and temporary storage
+backend/storage/
+backend/storage/uploads/
+backend/storage/reports/
+backend/storage/temp/
+
+# OS specific files
+.DS_Store
+Thumbs.db
+.env
+.flaskenv

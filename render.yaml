@@ -1,0 +1,36 @@
+services:
+  # Backend Web Service (Docker Runtime)
+  - type: web
+    name: pbi-qa-backend
+    runtime: docker
+    dockerContext: backend
+    dockerfilePath: Dockerfile
+    plan: starter
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true
+      - key: MOCK_SERVICE
+        value: "true" # Set to "false" once Entra ID credentials are added
+      - key: CLIENT_ID
+        sync: false # Set in Render Dashboard
+      - key: CLIENT_SECRET
+        sync: false # Set in Render Dashboard
+      - key: TENANT_ID
+        sync: false # Set in Render Dashboard
+
+  # Frontend Static Site
+  - type: web
+    name: pbi-qa-frontend
+    runtime: static
+    buildCommand: npm install && npm run build
+    publishDir: dist
+    staticPublishPath: frontend
+    routes:
+      # Proxy api routes to the backend
+      - type: rewrite
+        source: /api/*
+        destination: https://pbi-qa-backend.onrender.com/api/*
+      # Fallback for client side router
+      - type: rewrite
+        source: /*
+        destination: /index.html

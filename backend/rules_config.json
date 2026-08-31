@@ -1,0 +1,23 @@
+{
+  "power_query": {
+    "default_step_pattern": "^(Source|Changed Type|Filtered Rows|Renamed Columns|Removed Columns|Navigation)\\d*$",
+    "source_step_prefix": "^Src_",
+    "flag_inlined_source": true
+  },
+  "dax_measure": {
+    "pattern": "^[A-Z][a-zA-Z0-9_]*$",
+    "invalid_prefixes": ["Measure", "Calculated"],
+    "allowed_spaces": false
+  },
+  "dax_column": {
+    "pattern": "^[A-Z][a-zA-Z0-9_]*$",
+    "invalid_prefixes": ["Column"],
+    "allowed_spaces": false
+  },
+  "dax_complexity": {
+    "max_length": 150,
+    "max_nested_functions": 2,
+    "functions_to_check": ["CALCULATE", "FILTER", "SWITCH"],
+    "require_var_if_complex": true
+  }
+}

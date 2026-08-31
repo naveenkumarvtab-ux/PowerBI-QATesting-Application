@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "5000:5000"
+    environment:
+      - SECRET_KEY=pbi-qa-suite-secret-key-12345
+      - MOCK_SERVICE=true # Toggle to false when client credentials are provided
+      - CLIENT_ID=
+      - CLIENT_SECRET=
+      - TENANT_ID=
+    volumes:
+      - backend-storage:/app/storage
+
+  frontend:
+    image: node:20-slim
+    working_dir: /app
+    volumes:
+      - ./frontend:/app
+    ports:
+      - "5173:5173"
+    command: sh -c "npm install && npm run dev -- --host"
+    depends_on:
+      - backend
+
+volumes:
+  backend-storage:

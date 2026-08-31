@@ -5,7 +5,7 @@ services:
     runtime: docker
     dockerContext: backend
     dockerfilePath: Dockerfile
-    plan: starter
+    plan: free
     envVars:
       - key: SECRET_KEY
         generateValue: true

@@ -26,8 +26,8 @@ COPY . .
 # Setup directories for persistent data storage
 RUN mkdir -p storage/uploads storage/reports/screenshots
 
-# Expose Flask default port
+# Expose port (default 5000, overridden by Render's PORT env)
 EXPOSE 5000
 
-# Run with Gunicorn, 2 workers, and increased timeout (120s) for Playwright runs
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "2", "--timeout", "120", "app:app"]
+# Run with Gunicorn, using the port environment variable injected by Render
+CMD ["sh", "-c", "gunicorn --bind 0.0.0.0:${PORT:-5000} --workers 2 --timeout 120 app:app"]

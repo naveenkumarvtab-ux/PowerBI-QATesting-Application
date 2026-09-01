@@ -2,7 +2,73 @@ import os
 import time
 import json
 import base64
+import math
 from backend.config import Config
+
+def check_image_uniformity(img_path, std_threshold=6.0):
+    """
+    Checks if an image is suspiciously close to a single uniform color (e.g. blank canvas, flat green/black stub).
+    Returns (is_valid, max_std, note).
+    """
+    try:
+        from PIL import Image
+        with Image.open(img_path) as img:
+            img_rgb = img.convert("RGB")
+            thumb = img_rgb.resize((32, 32))
+            pixels = [p[:3] for p in thumb.getdata()]
+            
+            n = len(pixels)
+            if n == 0:
+                return False, 0.0, "Screenshot may not reflect actual rendered state — capture appeared blank/uniform."
+                
+            r_vals = [p[0] for p in pixels]
+            g_vals = [p[1] for p in pixels]
+            b_vals = [p[2] for p in pixels]
+            
+            mean_r = sum(r_vals) / n
+            mean_g = sum(g_vals) / n
+            mean_b = sum(b_vals) / n
+            
+            std_r = math.sqrt(sum((x - mean_r) ** 2 for x in r_vals) / n)
+            std_g = math.sqrt(sum((x - mean_g) ** 2 for x in g_vals) / n)
+            std_b = math.sqrt(sum((x - mean_b) ** 2 for x in b_vals) / n)
+            
+            max_std = max(std_r, std_g, std_b)
+            is_valid = max_std >= std_threshold
+            
+            note = None if is_valid else "Screenshot may not reflect actual rendered state — capture appeared blank/uniform."
+            return is_valid, max_std, note
+    except Exception as e:
+        return False, 0.0, f"Could not inspect screenshot: {e}"
+
+
+def capture_with_validation(page_or_locator, output_path, max_retries=1):
+    """
+    Captures screenshot scoped to locator or page, validates non-uniformity,
+    retries once after a buffer delay if blank/uniform, and returns (is_valid, note).
+    """
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    last_note = None
+    
+    for attempt in range(max_retries + 1):
+        try:
+            page_or_locator.screenshot(path=output_path)
+        except Exception:
+            try:
+                if hasattr(page_or_locator, "page"):
+                    page_or_locator.page.screenshot(path=output_path)
+            except Exception:
+                pass
+                
+        is_valid, max_std, note = check_image_uniformity(output_path)
+        if is_valid:
+            return True, None
+        last_note = note
+        if attempt < max_retries:
+            time.sleep(2.0)
+            
+    return False, last_note
+
 
 def generate_mock_screenshot(output_path, page_name="Sales Overview", bookmark_name="Category", status="pass"):
     try:
@@ -123,6 +189,12 @@ class PlaywrightFunctionalTester:
             progress_base = 60 + idx * 10
             self._log(f"Analyzing page: '{page}' - Verifying visual render tiles", progress_base)
             
+            page_screenshot_filename = f"screenshot_{self.job_id}_{page.replace(' ', '_')}.png"
+            page_screenshot_path = os.path.join(self.screenshot_dir, page_screenshot_filename)
+            generate_mock_screenshot(page_screenshot_path, page, "Default View", "pass")
+            is_valid, std_dev, note = check_image_uniformity(page_screenshot_path)
+            page_screenshot_url = f"/api/reports/screenshots/{page_screenshot_filename}"
+            
             # Pass page render check
             violations.append({
                 "target": f"Report Page: {page}",
@@ -130,7 +202,8 @@ class PlaywrightFunctionalTester:
                 "status": "pass",
                 "message": f"Page '{page}' rendered successfully without any error visuals.",
                 "suggested_fix": "",
-                "screenshot_url": None
+                "screenshot_url": page_screenshot_url,
+                "screenshot_note": note
             })
             
             # Simulated bookmark test
@@ -159,6 +232,7 @@ class PlaywrightFunctionalTester:
                 screenshot_filename = f"screenshot_{self.job_id}_bookmark_{bmark_disp}.png"
                 screenshot_path = os.path.join(self.screenshot_dir, screenshot_filename)
                 generate_mock_screenshot(screenshot_path, page, bmark_disp, "fail" if not state_changed else "pass")
+                is_valid, std_dev, note = check_image_uniformity(screenshot_path)
                 screenshot_url = f"/api/reports/screenshots/{screenshot_filename}"
                 
                 if not state_changed:
@@ -168,7 +242,8 @@ class PlaywrightFunctionalTester:
                         "status": "fail",
                         "message": f"Bookmark '{bmark_disp}' did not update visual state as expected on page '{page}'.",
                         "suggested_fix": "Check the bookmark's captured display/data settings in the Bookmarks pane in Power BI Desktop.",
-                        "screenshot_url": screenshot_url
+                        "screenshot_url": screenshot_url,
+                        "screenshot_note": note
                     })
                 else:
                     violations.append({
@@ -177,7 +252,8 @@ class PlaywrightFunctionalTester:
                         "status": "pass",
                         "message": "Visual states updated correctly on bookmark activation.",
                         "suggested_fix": "",
-                        "screenshot_url": screenshot_url
+                        "screenshot_url": screenshot_url,
+                        "screenshot_note": note
                     })
             
             # Simulated filter clear test
@@ -247,6 +323,7 @@ class PlaywrightFunctionalTester:
                 self._log("Launching Chromium browser", 20)
                 browser = p.chromium.launch(headless=True)
                 page = browser.new_page()
+                page.set_viewport_size({"width": 1280, "height": 720})
                 page.set_default_timeout(30000)
                 
                 self._log(f"Loading local Power BI Embedded harness: {harness_url}", 30)
@@ -255,6 +332,11 @@ class PlaywrightFunctionalTester:
                 # Wait for report to load/render via window.__pbiRendered flag set by SDK events
                 self._log("Waiting for Power BI report render complete...", 50)
                 page.wait_for_function("window.__pbiRendered === true", timeout=25000)
+                time.sleep(2.0)
+                
+                container_locator = page.locator("#report-container")
+                if container_locator.count() == 0:
+                    container_locator = page
                 
                 # 3. Retrieve authoritative page details and bookmarks list using JS SDK
                 self._log("Extracting report structure using JS SDK", 60)
@@ -293,12 +375,12 @@ class PlaywrightFunctionalTester:
                             await target.setActive();
                         }}
                     }}""")
-                    time.sleep(1.5)
+                    time.sleep(2.0)
                     
-                    # Capture page screenshot
+                    # Capture page screenshot with validation safeguard
                     screenshot_filename = f"screenshot_{self.job_id}_{p_disp.replace(' ', '_')}.png"
                     screenshot_path = os.path.join(self.screenshot_dir, screenshot_filename)
-                    page.screenshot(path=screenshot_path)
+                    is_valid, note = capture_with_validation(container_locator, screenshot_path)
                     screenshot_url = f"/api/reports/screenshots/{screenshot_filename}"
                     
                     # Visual tiles error check inside iframe
@@ -312,7 +394,8 @@ class PlaywrightFunctionalTester:
                             "status": "fail",
                             "message": f"Page '{p_disp}' rendered with visual tiles showing errors.",
                             "suggested_fix": "Analyze visual details for query timeouts or bad column references.",
-                            "screenshot_url": screenshot_url
+                            "screenshot_url": screenshot_url,
+                            "screenshot_note": note
                         })
                     else:
                         violations.append({
@@ -321,7 +404,8 @@ class PlaywrightFunctionalTester:
                             "status": "pass",
                             "message": f"Page '{p_disp}' rendered successfully without any error visuals.",
                             "suggested_fix": "",
-                            "screenshot_url": screenshot_url
+                            "screenshot_url": screenshot_url,
+                            "screenshot_note": note
                         })
 
                 # 5. Bookmarks verification phase (dynamic, report-wide)
@@ -349,7 +433,7 @@ class PlaywrightFunctionalTester:
                         const report = window.__pbiReport;
                         await report.bookmarksManager.apply("{rbm['name']}");
                     }}""")
-                    time.sleep(1.5)
+                    time.sleep(2.0)
                     
                     # Capture active page and filters after
                     after_info = page.evaluate("""async () => {
@@ -374,10 +458,10 @@ class PlaywrightFunctionalTester:
                         "state_changed": state_changed
                     })
                     
-                    # Capture screenshot
+                    # Capture screenshot with validation safeguard
                     screenshot_filename = f"screenshot_{self.job_id}_bookmark_{bm_disp}.png"
                     screenshot_path = os.path.join(self.screenshot_dir, screenshot_filename)
-                    page.screenshot(path=screenshot_path)
+                    is_valid, note = capture_with_validation(container_locator, screenshot_path)
                     bm_screenshot_url = f"/api/reports/screenshots/{screenshot_filename}"
                     
                     if not state_changed:
@@ -387,7 +471,8 @@ class PlaywrightFunctionalTester:
                             "status": "fail",
                             "message": f"Bookmark '{bm_disp}' did not update visual state as expected on page '{p_disp}'.",
                             "suggested_fix": "Check the bookmark's captured display/data settings in the Bookmarks pane in Power BI Desktop.",
-                            "screenshot_url": bm_screenshot_url
+                            "screenshot_url": bm_screenshot_url,
+                            "screenshot_note": note
                         })
                     else:
                         violations.append({
@@ -396,7 +481,8 @@ class PlaywrightFunctionalTester:
                             "status": "pass",
                             "message": "Visual states updated correctly on bookmark activation.",
                             "suggested_fix": "",
-                            "screenshot_url": bm_screenshot_url
+                            "screenshot_url": bm_screenshot_url,
+                            "screenshot_note": note
                         })
                         
                     # Re-navigate to the original page if the bookmark changed pages to keep a stable baseline

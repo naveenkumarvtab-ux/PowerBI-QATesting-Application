@@ -62,6 +62,7 @@ class RuleViolation(Base):
     message = Column(Text)
     suggested_fix = Column(Text)
     screenshot_url = Column(String(500), nullable=True)
+    screenshot_note = Column(Text, nullable=True)
     page_name = Column(String(255), nullable=True)
     visual_id = Column(String(255), nullable=True)
     visual_title = Column(String(255), nullable=True)
@@ -76,6 +77,7 @@ class RuleViolation(Base):
             "message": self.message,
             "suggested_fix": self.suggested_fix,
             "screenshot_url": self.screenshot_url,
+            "screenshot_note": self.screenshot_note,
             "page_name": self.page_name,
             "visual_id": self.visual_id,
             "visual_title": self.visual_title

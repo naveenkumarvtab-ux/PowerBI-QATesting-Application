@@ -217,7 +217,8 @@ def run_service_analysis_job(job_id, report_url, checks, auth_token, app_context
                     violations_to_insert.append(RuleViolation(
                         job_id=job_id, category=r["category"], target=r["target"],
                         status=r["status"], message=r["message"], suggested_fix=r["suggested_fix"],
-                        screenshot_url=r.get("screenshot_url")
+                        screenshot_url=r.get("screenshot_url"),
+                        screenshot_note=r.get("screenshot_note")
                     ))
             except Exception as e:
                 violations_to_insert.append(RuleViolation(

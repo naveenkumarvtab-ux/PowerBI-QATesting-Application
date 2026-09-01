@@ -157,7 +157,8 @@ def run_pbix_analysis_job(job_id, file_path, upload_name, run_functional, run_pd
                     violations_to_insert.append(RuleViolation(
                         job_id=job_id, category=r["category"], target=r["target"],
                         status=r["status"], message=r["message"], suggested_fix=r["suggested_fix"],
-                        screenshot_url=r.get("screenshot_url")
+                        screenshot_url=r.get("screenshot_url"),
+                        screenshot_note=r.get("screenshot_note")
                     ))
                 current_pct += (progress_step - 5)
 

@@ -124,7 +124,8 @@ class ReportBuilder:
                 "status": status,
                 "message": v.get("message", ""),
                 "suggested_fix": v.get("suggested_fix", ""),
-                "screenshot_url": v.get("screenshot_url")
+                "screenshot_url": v.get("screenshot_url"),
+                "screenshot_note": v.get("screenshot_note")
             })
             
         # Add placeholders for any missing check categories in the manifest
@@ -252,7 +253,8 @@ class ReportBuilder:
                     "status": status,
                     "message": v.get("message", ""),
                     "suggested_fix": v.get("suggested_fix", ""),
-                    "screenshot_url": v.get("screenshot_url")
+                    "screenshot_url": v.get("screenshot_url"),
+                    "screenshot_note": v.get("screenshot_note")
                 }
                 
                 # Retrieve explicit metadata

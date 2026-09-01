@@ -567,6 +567,12 @@ export default function ReportView() {
                               className="max-w-md w-full border border-slate-200 rounded-lg shadow-sm hover:scale-[1.02] transition-transform cursor-pointer"
                               onClick={() => window.open(res.screenshot_url, '_blank')}
                             />
+                            {res.screenshot_note && (
+                              <div className="mt-1.5 text-[11px] text-amber-700 bg-amber-50 border border-amber-200/80 px-2 py-1 rounded flex items-center gap-1.5 max-w-md">
+                                <AlertTriangle className="h-3.5 w-3.5 text-amber-500 flex-shrink-0" />
+                                <span>{res.screenshot_note}</span>
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>
@@ -695,6 +701,12 @@ export default function ReportView() {
                                       className="max-w-md w-full border border-slate-200 rounded-lg shadow-sm hover:scale-[1.02] transition-transform cursor-pointer"
                                       onClick={() => window.open(res.screenshot_url, '_blank')}
                                     />
+                                    {res.screenshot_note && (
+                                      <div className="mt-1.5 text-[11px] text-amber-700 bg-amber-50 border border-amber-200/80 px-2 py-1 rounded flex items-center gap-1.5 max-w-md">
+                                        <AlertTriangle className="h-3.5 w-3.5 text-amber-500 flex-shrink-0" />
+                                        <span>{res.screenshot_note}</span>
+                                      </div>
+                                    )}
                                   </div>
                                 )}
                               </div>
@@ -783,6 +795,12 @@ export default function ReportView() {
                                               className="max-w-md w-full border border-slate-200 rounded-lg shadow-sm hover:scale-[1.02] transition-transform cursor-pointer"
                                               onClick={() => window.open(res.screenshot_url, '_blank')}
                                             />
+                                            {res.screenshot_note && (
+                                              <div className="mt-1.5 text-[11px] text-amber-700 bg-amber-50 border border-amber-200/80 px-2 py-1 rounded flex items-center gap-1.5 max-w-md">
+                                                <AlertTriangle className="h-3.5 w-3.5 text-amber-500 flex-shrink-0" />
+                                                <span>{res.screenshot_note}</span>
+                                              </div>
+                                            )}
                                           </div>
                                         )}
                                       </div>

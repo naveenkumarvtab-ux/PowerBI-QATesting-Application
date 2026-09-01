@@ -30,21 +30,24 @@ class PowerBIAuthService:
             error_desc = result.get("error_description", "Unknown error acquiring token")
             raise Exception(f"Failed to acquire Service Principal token: {error_desc}")
 
-    def get_auth_url(self, redirect_uri, state=None):
+    def get_auth_url(self, redirect_uri, state=None, client_id=None, tenant_id=None):
         """
         Generate authorization URL for Delegated User OAuth Flow (Auth Code Flow).
         """
-        if Config.MOCK_SERVICE:
-            # Just return a simulated auth url pointing back to redirect_uri with mock code
-            return f"{redirect_uri}?code=mock_auth_code_12345&state={state or ''}"
+        effective_client_id = client_id or Config.CLIENT_ID
+        effective_tenant_id = tenant_id or Config.TENANT_ID or "common"
+        effective_authority = f"https://login.microsoftonline.com/{effective_tenant_id}"
 
-        if not Config.CLIENT_ID:
-            raise ValueError("Azure AD CLIENT_ID is missing. Set it in .env or enable MOCK_SERVICE.")
+        if not effective_client_id:
+            raise ValueError(
+                "Microsoft Azure App Registration (Client ID) is required to sign in with your corporate Microsoft account. "
+                "Please provide a Client ID or configure it in the backend settings."
+            )
 
         app = msal.ConfidentialClientApplication(
-            Config.CLIENT_ID,
-            authority=self.authority,
-            client_credential=Config.CLIENT_SECRET  # MSAL can use confidential app to swap delegated code later
+            effective_client_id,
+            authority=effective_authority,
+            client_credential=Config.CLIENT_SECRET or "dummy_secret"
         )
         
         # Power BI scopes for user access
@@ -61,21 +64,29 @@ class PowerBIAuthService:
         )
         return auth_url
 
-    def acquire_token_by_auth_code(self, code, redirect_uri):
+    def acquire_token_by_auth_code(self, code, redirect_uri, client_id=None, client_secret=None, tenant_id=None):
         """
         Exchange authorization code for access token.
         """
-        if Config.MOCK_SERVICE:
+        if code == "mock_auth_code_12345":
             return {
                 "access_token": "MOCK_DELEGATED_ACCESS_TOKEN_12345",
                 "refresh_token": "MOCK_DELEGATED_REFRESH_TOKEN_12345",
                 "username": "demo_user@yourdomain.onmicrosoft.com"
             }
 
+        effective_client_id = client_id or Config.CLIENT_ID
+        effective_client_secret = client_secret or Config.CLIENT_SECRET
+        effective_tenant_id = tenant_id or Config.TENANT_ID or "common"
+        effective_authority = f"https://login.microsoftonline.com/{effective_tenant_id}"
+
+        if not effective_client_id:
+            raise ValueError("Azure AD CLIENT_ID is missing.")
+
         app = msal.ConfidentialClientApplication(
-            Config.CLIENT_ID,
-            authority=self.authority,
-            client_credential=Config.CLIENT_SECRET
+            effective_client_id,
+            authority=effective_authority,
+            client_credential=effective_client_secret
         )
         
         scopes = [
@@ -94,8 +105,8 @@ class PowerBIAuthService:
             return {
                 "access_token": result["access_token"],
                 "refresh_token": result.get("refresh_token"),
-                "username": result.get("id_token_claims", {}).get("preferred_username", "Unknown User")
+                "username": result.get("id_token_claims", {}).get("preferred_username") or result.get("id_token_claims", {}).get("upn") or "Microsoft User"
             }
         else:
             error_desc = result.get("error_description", "Unknown error exchanging auth code")
-            raise Exception(f"Failed to acquire user token: {error_desc}")
+            raise Exception(f"Failed to acquire token from Microsoft: {error_desc}")

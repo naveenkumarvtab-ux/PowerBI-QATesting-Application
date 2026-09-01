@@ -348,8 +348,10 @@ def service_connect():
             if not redirect_uri:
                 return jsonify({"error": "redirect_uri is required for delegated user auth"}), 400
                 
+            client_id = data.get("client_id")
+            tenant_id = data.get("tenant_id")
             state = str(uuid.uuid4())
-            auth_url = auth_service.get_auth_url(redirect_uri, state)
+            auth_url = auth_service.get_auth_url(redirect_uri, state, client_id=client_id, tenant_id=tenant_id)
             return jsonify({
                 "success": True,
                 "auth_url": auth_url,
@@ -372,11 +374,19 @@ def oauth_callback():
         data = request.get_json() or {}
         code = data.get("code")
         redirect_uri = data.get("redirect_uri")
+        client_id = data.get("client_id")
+        client_secret = data.get("client_secret")
+        tenant_id = data.get("tenant_id")
         
         if not code or not redirect_uri:
             return jsonify({"error": "code and redirect_uri are required"}), 400
             
-        token_info = auth_service.acquire_token_by_auth_code(code, redirect_uri)
+        token_info = auth_service.acquire_token_by_auth_code(
+            code, redirect_uri,
+            client_id=client_id,
+            client_secret=client_secret,
+            tenant_id=tenant_id
+        )
         session_id = str(uuid.uuid4())
         USER_TOKENS[session_id] = token_info
         

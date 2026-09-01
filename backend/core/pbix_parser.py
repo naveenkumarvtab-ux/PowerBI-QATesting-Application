@@ -1652,13 +1652,23 @@ def check_unused_columns(columns_df, levels_df, relationships_df, layout_json, d
     unused_cols_count = 0
     
     for _, col_row in columns_df.iterrows():
-        t_name = str(col_row.get("TableName"))
-        c_name = str(col_row.get("Name"))
+        t_name = str(col_row.get("TableName", ""))
+        c_name = str(col_row.get("Name", ""))
         c_id = col_row.get("ID")
         
-        if hidden_tables_set and t_name.lower() in hidden_tables_set:
+        # Filter out internal VertiPaq hierarchy and system tables
+        if t_name.startswith(("H$", "U$", "R$", "T$", "$", "DateTableTemplate_", "LocalDateTable_", "__", "RowNumber-")):
             continue
-        if t_name.startswith(("DateTableTemplate_", "LocalDateTable_", "__", "RowNumber-")):
+        if "localdatetable" in t_name.lower() or "datetabletemplate" in t_name.lower() or "$" in t_name:
+            continue
+            
+        # Filter out internal VertiPaq system columns
+        if c_name.startswith(("RowNumber", "POS_TO_ID", "ID_TO_POS", "MULTI_LEVEL_ID", "PARENT_POS", "FIRST_CHILD_POS", "CHILD_COUNT")):
+            continue
+        if "$" in c_name:
+            continue
+
+        if hidden_tables_set and t_name.lower() in hidden_tables_set:
             continue
         if col_row.get("IsHidden") == 1 or col_row.get("IsPrivate") == 1:
             continue

@@ -1,4 +1,5 @@
 import os
+import json
 import re
 import uuid
 import datetime
@@ -145,6 +146,8 @@ def run_service_analysis_job(job_id, report_url, checks, auth_token, app_context
                         parsed_meta = parser.parse()
                         layout_str = parsed_meta.get("layout_str")
                         job.layout_str = layout_str
+                        if parsed_meta.get("excluded_counts"):
+                            job.excluded_counts_str = json.dumps(parsed_meta.get("excluded_counts"))
                         layout_violations = parsed_meta.get("layout_violations", [])
                         
                         # Add layout violations (font consistency, visual alignment, unused measures, static actions)

@@ -1,4 +1,5 @@
 import os
+import json
 from flask import Blueprint, jsonify, send_file, request, current_app
 from backend.models.job import Job, RuleViolation
 from backend.config import Config
@@ -64,7 +65,8 @@ def get_job_result(job_id):
         
         # Build standard output using ReportBuilder
         violations_data = [v.to_dict() for v in violations]
-        report_json = ReportBuilder.build_json(job, violations_data, layout_str=job.layout_str)
+        excluded_counts = json.loads(job.excluded_counts_str) if getattr(job, 'excluded_counts_str', None) else None
+        report_json = ReportBuilder.build_json(job, violations_data, layout_str=job.layout_str, excluded_counts=excluded_counts)
         
         return jsonify(report_json)
     except Exception as e:

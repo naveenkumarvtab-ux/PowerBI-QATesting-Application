@@ -1,4 +1,5 @@
 import os
+import json
 import uuid
 import datetime
 from threading import Thread
@@ -79,6 +80,8 @@ def run_pbix_analysis_job(job_id, file_path, upload_name, run_functional, run_pd
 
         # Save layout_str on job object for UI rendering persistence
         job.layout_str = metadata.get("layout_str")
+        if metadata.get("excluded_counts"):
+            job.excluded_counts_str = json.dumps(metadata.get("excluded_counts"))
 
         # Run dataset-level checks (unused and duplicate measures)
         dataset_checks = dax_anal.analyze_dataset(

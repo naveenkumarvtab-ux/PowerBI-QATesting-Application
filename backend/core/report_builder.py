@@ -8,7 +8,7 @@ from reportlab.lib import colors
 
 class ReportBuilder:
     @classmethod
-    def build_json(cls, job, violations, total_measures=None, unused_measures_count=None, layout_str=None):
+    def build_json(cls, job, violations, total_measures=None, unused_measures_count=None, layout_str=None, excluded_counts=None):
         """
         Builds and returns the normalized JSON schema for the report results.
         """
@@ -168,6 +168,18 @@ class ReportBuilder:
             unused_cols_count = sum(1 for r in sect["results"] if r["status"] == "warning")
             sect["summary_info"] = f"{unused_cols_count} of {total_cols_count} columns unused"
                 
+        # Add section-level exclusion notes
+        if excluded_counts:
+            for cat_key, sect in sections_dict.items():
+                cnt = excluded_counts.get(cat_key, 0)
+                if cnt > 0:
+                    if cat_key == "power_query_naming":
+                        sect["excluded_note"] = f"{cnt} hidden {'query was' if cnt == 1 else 'queries were'} (Enable Load disabled) excluded from this check."
+                    elif cat_key in ("data_model", "unused_columns", "unused_measures"):
+                        sect["excluded_note"] = f"{cnt} hidden {'table was' if cnt == 1 else 'tables were'} excluded from this check."
+                    else:
+                        sect["excluded_note"] = f"{cnt} hidden {'item was' if cnt == 1 else 'items were'} excluded from this check."
+
         # Parse layout JSON to generate page-grouped view
         layout = None
         if layout_str:

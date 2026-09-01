@@ -54,11 +54,12 @@ def test_font_consistency():
     }
     
     violations = check_font_consistency(mock_layout, mock_theme)
-    # Times New Roman should be flagged as warning
+    # Times New Roman should be flagged as warning with both font and size
     warnings = [v for v in violations if v["status"] == "warning"]
     assert len(warnings) == 1
     assert "Times New Roman" in warnings[0]["message"]
     assert "Arial" in warnings[0]["message"]
+    assert "standard" not in warnings[0]["message"].lower()
 
     # Scenario 2: Perfect consistency (only Arial)
     mock_layout_clean = {
@@ -88,7 +89,8 @@ def test_font_consistency():
     violations_clean = check_font_consistency(mock_layout_clean, mock_theme)
     passes = [v for v in violations_clean if v["status"] == "pass"]
     assert len(passes) == 1
-    assert "consistent font family" in passes[0]["message"]
+    assert "All headers use a consistent font and size, and all values use a consistent font and size, across the report." in passes[0]["message"]
+    assert "standard" not in passes[0]["message"].lower()
 
 
 def test_unused_measures():

@@ -5,7 +5,7 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer 
 } from 'recharts';
 import { 
-  Download, ArrowLeft, CheckCircle2, AlertTriangle, XCircle, ChevronDown, ChevronUp, AlertCircle, Loader2
+  Download, ArrowLeft, CheckCircle2, AlertTriangle, XCircle, ChevronDown, ChevronUp, AlertCircle, Loader2, Info
 } from 'lucide-react';
 
 export default function ReportView() {
@@ -431,6 +431,14 @@ export default function ReportView() {
               {/* Section Content */}
               {!isCollapsed && (
                 <div className="divide-y divide-slate-100 px-5">
+                  {/* Excluded Note */}
+                  {sec.excluded_note && (
+                    <div className="my-3 p-2.5 bg-slate-50 border border-slate-200/80 text-slate-600 rounded-lg text-xs leading-relaxed flex items-center gap-2">
+                      <Info className="h-4 w-4 text-slate-400 flex-shrink-0" />
+                      <span>{sec.excluded_note}</span>
+                    </div>
+                  )}
+
                   {/* Caveat Alert */}
                   {sec.caveat && (
                     <div className="my-3 p-3 bg-amber-50/50 border border-amber-200 text-amber-900 rounded-lg text-xs leading-relaxed flex items-start gap-2">

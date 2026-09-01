@@ -26,10 +26,12 @@ class Job(Base):
     report_pdf_path = Column(String(500), nullable=True)
     report_html_path = Column(String(500), nullable=True)
     layout_str = Column(Text, nullable=True)
+    excluded_counts_str = Column(Text, nullable=True)
     
     violations = relationship("RuleViolation", back_populates="job", cascade="all, delete-orphan")
 
     def to_dict(self):
+        import json
         return {
             "job_id": self.id,
             "method": self.method,
@@ -45,7 +47,8 @@ class Job(Base):
                 "failed": self.summary_failed,
                 "warnings": self.summary_warnings
             },
-            "layout_str": self.layout_str
+            "layout_str": self.layout_str,
+            "excluded_counts": json.loads(self.excluded_counts_str) if self.excluded_counts_str else {}
         }
 
 class RuleViolation(Base):

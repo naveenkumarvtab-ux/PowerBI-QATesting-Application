@@ -89,16 +89,45 @@ class PBIXParser:
         columns_df = None
         levels_df = None
         relationships_df = None
-        tables_list = []
+        all_tables = []
+        hidden_tables_set = set()
+        visible_tables_list = []
         
         if parsed_via_library:
             columns_df = getattr(model, "tmschema_columns", None)
             levels_df = getattr(model, "tmschema_levels", None)
             relationships_df = getattr(model, "relationships", None)
+            tmschema_tables = getattr(model, "tmschema_tables", None)
+            
+            if tmschema_tables is not None and hasattr(tmschema_tables, "iterrows"):
+                for _, t_row in tmschema_tables.iterrows():
+                    t_name = str(t_row.get("Name"))
+                    is_hidden = (t_row.get("IsHidden") == 1 or t_row.get("IsPrivate") == 1)
+                    if is_hidden or t_name.startswith(("DateTableTemplate_", "LocalDateTable_", "__", "RowNumber-")):
+                        hidden_tables_set.add(t_name.lower())
+                    else:
+                        if t_name not in visible_tables_list:
+                            visible_tables_list.append(t_name)
+                    if t_name not in all_tables:
+                        all_tables.append(t_name)
+                        
             if hasattr(model, "tables") and model.tables is not None:
-                tables_list = [str(t) for t in list(model.tables) if not str(t).startswith(("DateTableTemplate_", "LocalDateTable_", "__"))]
+                for t in list(model.tables):
+                    t_name = str(t)
+                    if t_name not in all_tables:
+                        all_tables.append(t_name)
+                    if t_name.startswith(("DateTableTemplate_", "LocalDateTable_", "__", "RowNumber-")):
+                        hidden_tables_set.add(t_name.lower())
+                    elif t_name.lower() not in hidden_tables_set and t_name not in visible_tables_list:
+                        visible_tables_list.append(t_name)
         else:
-            tables_list = getattr(self, "tables_list", [])
+            raw_tables = getattr(self, "tables_list", [])
+            for t_name in raw_tables:
+                if str(t_name).startswith(("DateTableTemplate_", "LocalDateTable_", "__", "RowNumber-")):
+                    hidden_tables_set.add(str(t_name).lower())
+                else:
+                    visible_tables_list.append(str(t_name))
+                all_tables.append(str(t_name))
             rels = getattr(self, "relationships_list", [])
             if rels:
                 import pandas as pd
@@ -106,6 +135,22 @@ class PBIXParser:
 
         # Fallback manual extraction
         self._manual_extraction()
+        
+        # Filter queries to visible model queries
+        visible_m_queries = {
+            k: v for k, v in self.m_queries.items()
+            if (k.lower() in [vt.lower() for vt in visible_tables_list] and k.lower() not in hidden_tables_set)
+        }
+        hidden_m_queries_count = max(0, len(self.m_queries) - len(visible_m_queries))
+        hidden_tables_count = len(hidden_tables_set)
+        
+        self.excluded_counts = {
+            "power_query_naming": hidden_m_queries_count,
+            "data_model": hidden_tables_count,
+            "unused_columns": hidden_tables_count,
+            "unused_measures": hidden_tables_count,
+            "dax_calculated_columns": hidden_tables_count
+        }
         
         # Run new layout-level checks if layout string is present
         if self.layout_str:
@@ -160,7 +205,8 @@ class PBIXParser:
                 # 4. Run Unused Columns Check
                 try:
                     unused_col_violations, total_c, unused_c = check_unused_columns(
-                        columns_df, levels_df, relationships_df, layout, self.dax_measures, self.dax_columns
+                        columns_df, levels_df, relationships_df, layout, self.dax_measures, self.dax_columns,
+                        hidden_tables_set=hidden_tables_set
                     )
                     self.layout_violations.extend(unused_col_violations)
                     self.total_columns = total_c
@@ -177,7 +223,7 @@ class PBIXParser:
                     
                 # 5. Run Disconnected Tables Check
                 try:
-                    data_model_violations = check_disconnected_tables(tables_list, relationships_df)
+                    data_model_violations = check_disconnected_tables(visible_tables_list, relationships_df)
                     self.layout_violations.extend(data_model_violations)
                 except Exception as de:
                     print(f"Disconnected tables check failed: {de}")
@@ -193,7 +239,8 @@ class PBIXParser:
         
         # Deduplicate and return
         return {
-            "m_queries": self.m_queries,
+            "m_queries": visible_m_queries,
+            "all_m_queries": self.m_queries,
             "dax_measures": self.dax_measures,
             "dax_columns": self.dax_columns,
             "pages": self.pages,
@@ -205,7 +252,11 @@ class PBIXParser:
             "total_measures": self.total_measures,
             "unused_measures_count": self.unused_measures_count,
             "total_columns": self.total_columns,
-            "unused_columns_count": self.unused_columns_count
+            "unused_columns_count": self.unused_columns_count,
+            "visible_tables": visible_tables_list,
+            "hidden_tables_count": hidden_tables_count,
+            "hidden_queries_count": hidden_m_queries_count,
+            "excluded_counts": self.excluded_counts
         }
 
     def _manual_extraction(self):
@@ -814,11 +865,12 @@ def check_font_consistency(layout_json, theme_json=None):
         
 def check_font_consistency(layout_json, theme_fonts=None):
     """
-    Identifies visual elements on report pages that do not match the report standard for their role.
+    Checks role-to-role font consistency across all visual elements in the report.
     Roles:
       - "header": visual title, column headers, axis titles
       - "value": data labels, card values, tick labels, legend labels, text runs
-    Checks both font family and normalized size.
+    Evaluates whether all elements in a role are uniform (same font and size).
+    Does NOT assert any single "report standard".
     """
     from collections import Counter
     import re
@@ -842,7 +894,7 @@ def check_font_consistency(layout_json, theme_fonts=None):
         find_fonts_in_dict(theme_fonts)
         theme_fonts = extracted_fonts
 
-    # 1. Fallback dominant family
+    # Fallback default family
     general_dominant_family = "Segoe UI"
     if theme_fonts:
         general_dominant_family = Counter(theme_fonts).most_common(1)[0][0]
@@ -872,7 +924,6 @@ def check_font_consistency(layout_json, theme_fonts=None):
                 return f"{int(num_str)}pt"
         return None
 
-    # Collect formatting elements grouped by visual container
     visuals_elements = {}
     all_elements = []
 
@@ -966,7 +1017,7 @@ def check_font_consistency(layout_json, theme_fonts=None):
 
             scan_properties(config)
 
-            # Insert default values
+            # Record default theme elements for un-overridden roles in this visual
             has_explicit_header = any(el["role"] == "header" for el in visuals_elements[vis_key])
             has_explicit_value = any(el["role"] == "value" for el in visuals_elements[vis_key])
 
@@ -990,69 +1041,74 @@ def check_font_consistency(layout_json, theme_fonts=None):
                 visuals_elements[vis_key].append(elem_info)
                 all_elements.append(elem_info)
 
-    # 2. Determine dominant family and size per role
-    dominant_specs = {}
-    for role in ("header", "value", "tooltip", "other"):
-        role_families = [el["font_family"] for el in all_elements if el["role"] == role and el["font_family"]]
-        role_sizes = [el["font_size"] for el in all_elements if el["role"] == role and el["font_size"]]
+    # 1. Determine majority font and majority size per role
+    role_fonts = {}
+    role_sizes = {}
+    for role in ("header", "value"):
+        fonts = [el["font_family"] for el in all_elements if el["role"] == role and el["font_family"]]
+        sizes = [el["font_size"] for el in all_elements if el["role"] == role and el["font_size"]]
+        
+        maj_f = Counter(fonts).most_common(1)[0][0] if fonts else general_dominant_family
+        maj_s = Counter(sizes).most_common(1)[0][0] if sizes else ("14pt" if role == "header" else "10pt")
+        role_fonts[role] = maj_f
+        role_sizes[role] = maj_s
 
-        dom_family = None
-        if role_families:
-            dom_family = Counter(role_families).most_common(1)[0][0]
-        else:
-            dom_family = general_dominant_family
-
-        dom_size = None
-        if role_sizes:
-            dom_size = Counter(role_sizes).most_common(1)[0][0]
-
-        dominant_specs[role] = {
-            "font_family": dom_family,
-            "font_size": dom_size
-        }
+    # 2. Fill complete (font, size) pair for every element in each visual
+    for vis_key, elems in visuals_elements.items():
+        for el in elems:
+            role = el["role"]
+            if role in ("header", "value"):
+                if not el["font_family"]:
+                    el["font_family"] = role_fonts[role]
+                if not el["font_size"]:
+                    el["font_size"] = role_sizes[role]
 
     violations = []
     has_mismatch = False
 
-    # 3. Check for mismatches per visual
+    # 3. Check for role mismatches per visual
     for (page_name, visual_title, vc_id), vis_elems in visuals_elements.items():
-        issues = []
-        for role in ("header", "value", "tooltip", "other"):
-            role_elems = [el for el in vis_elems if el["role"] == role]
-            family_mismatch = None
-            size_mismatch = None
-            dom = dominant_specs[role]
+        role_issues = {}
+        for role in ("header", "value"):
+            maj_f = role_fonts[role]
+            maj_s = role_sizes[role]
+            
+            # Check this visual's elements for this role
+            v_role_elems = [el for el in vis_elems if el["role"] == role and el.get("path") != "default_theme"]
+            
+            for el in v_role_elems:
+                f = el["font_family"]
+                s = el["font_size"]
+                if f.lower() != maj_f.lower() or s != maj_s:
+                    found_str = f"{f} {s}"
+                    maj_str = f"{maj_f} {maj_s}"
+                    role_issues[role] = (found_str, maj_str)
+                    break
 
-            for el in role_elems:
-                # Flag family mismatch only if explicitly specified and differs
-                if el["font_family"] and dom["font_family"] and el["font_family"].lower() != dom["font_family"].lower() and el["path"] != "default_theme":
-                    family_mismatch = (el["font_family"], dom["font_family"])
-                # Flag size mismatch only if explicitly specified and differs
-                if el["font_size"] and dom["font_size"] and el["font_size"] != dom["font_size"] and el["path"] != "default_theme":
-                    size_mismatch = (el["font_size"], dom["font_size"])
-
-            if family_mismatch or size_mismatch:
-                found_parts = []
-                expected_parts = []
-                if family_mismatch:
-                    found_parts.append(family_mismatch[0])
-                    expected_parts.append(family_mismatch[1])
-                if size_mismatch:
-                    found_parts.append(size_mismatch[0])
-                    expected_parts.append(size_mismatch[1])
-                
-                found_str = " ".join(found_parts)
-                expected_str = " ".join(expected_parts)
-                issues.append(f"{role} uses '{found_str}' (report {role} standard is '{expected_str}')")
-
-        if issues:
+        if role_issues:
             has_mismatch = True
+            h_issue = role_issues.get("header")
+            v_issue = role_issues.get("value")
+            
+            if h_issue and v_issue:
+                message = (f"Visual '{visual_title}' on page '{page_name}' has inconsistent fonts: "
+                           f"header uses '{h_issue[0]}' while most headers use '{h_issue[1]}'; "
+                           f"value uses '{v_issue[0]}' while most values use '{v_issue[1]}'.")
+            elif h_issue:
+                message = (f"Visual '{visual_title}' on page '{page_name}' uses '{h_issue[0]}' for its header "
+                           f"— most other headers in the report use '{h_issue[1]}'. Header fonts are not consistent across the report.")
+            elif v_issue:
+                message = (f"Visual '{visual_title}' on page '{page_name}' uses '{v_issue[0]}' for its value "
+                           f"— most other values in the report use '{v_issue[1]}'. Value fonts are not consistent across the report.")
+            else:
+                message = f"Visual '{visual_title}' on page '{page_name}' has inconsistent fonts."
+
             violations.append({
                 "category": "font_consistency",
                 "status": "warning",
                 "target": f"Font Consistency ({page_name} - {visual_title})",
-                "message": f"Visual '{visual_title}' on page '{page_name}' has font inconsistencies: {'; '.join(issues)}.",
-                "suggested_fix": "Update the flagged element(s) in the Format pane (or apply the report theme) to match the report's standard font/size for their role.",
+                "message": message,
+                "suggested_fix": "Update the flagged element(s) in the Format pane (or apply the report theme) to match the font and size used by other elements with the same role.",
                 "page_name": page_name,
                 "visual_id": vc_id,
                 "visual_title": visual_title
@@ -1060,26 +1116,11 @@ def check_font_consistency(layout_json, theme_fonts=None):
 
     # 4. Report-wide summary PASS if zero mismatches found
     if not has_mismatch:
-        pass_parts = []
-        for role in ("header", "value"):
-            dom = dominant_specs[role]
-            spec_parts = []
-            if dom["font_family"]:
-                spec_parts.append(dom["font_family"])
-            if dom["font_size"]:
-                spec_parts.append(dom["font_size"])
-            if spec_parts:
-                pass_parts.append(f"{role}s consistently use '{' '.join(spec_parts)}'")
-
-        pass_message = "All text elements use a consistent font family."
-        if pass_parts:
-            pass_message = "All text elements use a consistent font family: " + " and ".join(pass_parts) + " across all pages."
-
         violations.append({
             "category": "font_consistency",
             "status": "pass",
             "target": "Font Consistency (Report-wide)",
-            "message": pass_message,
+            "message": "All headers use a consistent font and size, and all values use a consistent font and size, across the report.",
             "suggested_fix": ""
         })
 
@@ -1494,11 +1535,12 @@ def check_visual_alignment(layout_json):
     return violations
 
 
-def check_unused_columns(columns_df, levels_df, relationships_df, layout_json, dax_measures, dax_columns):
+def check_unused_columns(columns_df, levels_df, relationships_df, layout_json, dax_measures, dax_columns, hidden_tables_set=None):
     violations = []
     if columns_df is None or columns_df.empty:
         return violations, 0, 0
         
+    hidden_tables_set = hidden_tables_set or set()
     hierarchy_col_ids = set()
     if levels_df is not None and not levels_df.empty:
         if "ColumnID" in levels_df.columns:
@@ -1614,7 +1656,11 @@ def check_unused_columns(columns_df, levels_df, relationships_df, layout_json, d
         c_name = str(col_row.get("Name"))
         c_id = col_row.get("ID")
         
-        if t_name.startswith(("DateTableTemplate_", "LocalDateTable_", "__")):
+        if hidden_tables_set and t_name.lower() in hidden_tables_set:
+            continue
+        if t_name.startswith(("DateTableTemplate_", "LocalDateTable_", "__", "RowNumber-")):
+            continue
+        if col_row.get("IsHidden") == 1 or col_row.get("IsPrivate") == 1:
             continue
             
         total_cols += 1

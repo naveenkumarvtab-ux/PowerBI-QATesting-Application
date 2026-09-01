@@ -339,15 +339,6 @@ class ReportBuilder:
                 elif res["status"] == "warning":
                     status_color = "bg-yellow-100 text-yellow-800 border-yellow-300"
                     
-                screenshot_html = ""
-                if res.get("screenshot_url"):
-                    screenshot_html = f'''
-                    <div class="mt-2">
-                        <p class="text-xs text-gray-500 font-semibold mb-1">Execution Screenshot:</p>
-                        <img src="{res['screenshot_url']}" class="max-w-md border rounded shadow-sm" alt="Screenshot" />
-                    </div>
-                    '''
-                    
                 fix_html = ""
                 if res["suggested_fix"]:
                     fix_html = f'''
@@ -366,7 +357,6 @@ class ReportBuilder:
                     </div>
                     <p class="text-gray-600 text-xs mt-1">{res['message']}</p>
                     {fix_html}
-                    {screenshot_html}
                 </div>
                 '''
                 

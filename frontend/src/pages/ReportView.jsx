@@ -555,26 +555,6 @@ export default function ReportView() {
                             <span className="text-slate-600">{res.suggested_fix}</span>
                           </div>
                         )}
-
-                        {res.screenshot_url && (
-                          <div className="mt-3">
-                            <span className="text-[10px] font-bold uppercase text-slate-400 block mb-1">
-                              Screenshot Captured
-                            </span>
-                            <img 
-                              src={res.screenshot_url} 
-                              alt="Visual Error Screenshot" 
-                              className="max-w-md w-full border border-slate-200 rounded-lg shadow-sm hover:scale-[1.02] transition-transform cursor-pointer"
-                              onClick={() => window.open(res.screenshot_url, '_blank')}
-                            />
-                            {res.screenshot_note && (
-                              <div className="mt-1.5 text-[11px] text-amber-700 bg-amber-50 border border-amber-200/80 px-2 py-1 rounded flex items-center gap-1.5 max-w-md">
-                                <AlertTriangle className="h-3.5 w-3.5 text-amber-500 flex-shrink-0" />
-                                <span>{res.screenshot_note}</span>
-                              </div>
-                            )}
-                          </div>
-                        )}
                       </div>
                     ))
                   )}
@@ -693,22 +673,6 @@ export default function ReportView() {
                                     <span className="text-slate-600 block mt-0.5">{res.suggested_fix}</span>
                                   </div>
                                 )}
-                                {res.screenshot_url && (
-                                  <div className="mt-3">
-                                    <img 
-                                      src={res.screenshot_url} 
-                                      alt="Screenshot" 
-                                      className="max-w-md w-full border border-slate-200 rounded-lg shadow-sm hover:scale-[1.02] transition-transform cursor-pointer"
-                                      onClick={() => window.open(res.screenshot_url, '_blank')}
-                                    />
-                                    {res.screenshot_note && (
-                                      <div className="mt-1.5 text-[11px] text-amber-700 bg-amber-50 border border-amber-200/80 px-2 py-1 rounded flex items-center gap-1.5 max-w-md">
-                                        <AlertTriangle className="h-3.5 w-3.5 text-amber-500 flex-shrink-0" />
-                                        <span>{res.screenshot_note}</span>
-                                      </div>
-                                    )}
-                                  </div>
-                                )}
                               </div>
                               <span className={`px-2 py-0.5 rounded text-[10px] font-bold tracking-wider uppercase border flex-shrink-0 flex items-center gap-1 ${
                                 res.status === 'pass' && 'bg-emerald-50 text-emerald-800 border-emerald-200'
@@ -785,22 +749,6 @@ export default function ReportView() {
                                           <div className="mt-2 p-2 bg-slate-50 border border-slate-200 rounded text-[11px] leading-relaxed">
                                             <strong className="font-bold text-slate-700">Suggested Fix:</strong>
                                             <span className="text-slate-600 block mt-0.5">{res.suggested_fix}</span>
-                                          </div>
-                                        )}
-                                        {res.screenshot_url && (
-                                          <div className="mt-3">
-                                            <img 
-                                              src={res.screenshot_url} 
-                                              alt="Screenshot" 
-                                              className="max-w-md w-full border border-slate-200 rounded-lg shadow-sm hover:scale-[1.02] transition-transform cursor-pointer"
-                                              onClick={() => window.open(res.screenshot_url, '_blank')}
-                                            />
-                                            {res.screenshot_note && (
-                                              <div className="mt-1.5 text-[11px] text-amber-700 bg-amber-50 border border-amber-200/80 px-2 py-1 rounded flex items-center gap-1.5 max-w-md">
-                                                <AlertTriangle className="h-3.5 w-3.5 text-amber-500 flex-shrink-0" />
-                                                <span>{res.screenshot_note}</span>
-                                              </div>
-                                            )}
                                           </div>
                                         )}
                                       </div>

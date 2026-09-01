@@ -189,12 +189,6 @@ class PlaywrightFunctionalTester:
             progress_base = 60 + idx * 10
             self._log(f"Analyzing page: '{page}' - Verifying visual render tiles", progress_base)
             
-            page_screenshot_filename = f"screenshot_{self.job_id}_{page.replace(' ', '_')}.png"
-            page_screenshot_path = os.path.join(self.screenshot_dir, page_screenshot_filename)
-            generate_mock_screenshot(page_screenshot_path, page, "Default View", "pass")
-            is_valid, std_dev, note = check_image_uniformity(page_screenshot_path)
-            page_screenshot_url = f"/api/reports/screenshots/{page_screenshot_filename}"
-            
             # Pass page render check
             violations.append({
                 "target": f"Report Page: {page}",
@@ -202,8 +196,7 @@ class PlaywrightFunctionalTester:
                 "status": "pass",
                 "message": f"Page '{page}' rendered successfully without any error visuals.",
                 "suggested_fix": "",
-                "screenshot_url": page_screenshot_url,
-                "screenshot_note": note
+                "screenshot_url": None
             })
             
             # Simulated bookmark test
@@ -229,12 +222,6 @@ class PlaywrightFunctionalTester:
                     "state_changed": state_changed
                 })
                 
-                screenshot_filename = f"screenshot_{self.job_id}_bookmark_{bmark_disp}.png"
-                screenshot_path = os.path.join(self.screenshot_dir, screenshot_filename)
-                generate_mock_screenshot(screenshot_path, page, bmark_disp, "fail" if not state_changed else "pass")
-                is_valid, std_dev, note = check_image_uniformity(screenshot_path)
-                screenshot_url = f"/api/reports/screenshots/{screenshot_filename}"
-                
                 if not state_changed:
                     violations.append({
                         "target": f"Bookmark: {bmark_disp} ({page})",
@@ -242,8 +229,7 @@ class PlaywrightFunctionalTester:
                         "status": "fail",
                         "message": f"Bookmark '{bmark_disp}' did not update visual state as expected on page '{page}'.",
                         "suggested_fix": "Check the bookmark's captured display/data settings in the Bookmarks pane in Power BI Desktop.",
-                        "screenshot_url": screenshot_url,
-                        "screenshot_note": note
+                        "screenshot_url": None
                     })
                 else:
                     violations.append({
@@ -252,8 +238,7 @@ class PlaywrightFunctionalTester:
                         "status": "pass",
                         "message": "Visual states updated correctly on bookmark activation.",
                         "suggested_fix": "",
-                        "screenshot_url": screenshot_url,
-                        "screenshot_note": note
+                        "screenshot_url": None
                     })
             
             # Simulated filter clear test
@@ -377,12 +362,6 @@ class PlaywrightFunctionalTester:
                     }}""")
                     time.sleep(2.0)
                     
-                    # Capture page screenshot with validation safeguard
-                    screenshot_filename = f"screenshot_{self.job_id}_{p_disp.replace(' ', '_')}.png"
-                    screenshot_path = os.path.join(self.screenshot_dir, screenshot_filename)
-                    is_valid, note = capture_with_validation(container_locator, screenshot_path)
-                    screenshot_url = f"/api/reports/screenshots/{screenshot_filename}"
-                    
                     # Visual tiles error check inside iframe
                     iframe_locator = page.frame_locator("iframe").first
                     error_icons = iframe_locator.locator(".error-icon").all()
@@ -394,8 +373,7 @@ class PlaywrightFunctionalTester:
                             "status": "fail",
                             "message": f"Page '{p_disp}' rendered with visual tiles showing errors.",
                             "suggested_fix": "Analyze visual details for query timeouts or bad column references.",
-                            "screenshot_url": screenshot_url,
-                            "screenshot_note": note
+                            "screenshot_url": None
                         })
                     else:
                         violations.append({
@@ -404,8 +382,7 @@ class PlaywrightFunctionalTester:
                             "status": "pass",
                             "message": f"Page '{p_disp}' rendered successfully without any error visuals.",
                             "suggested_fix": "",
-                            "screenshot_url": screenshot_url,
-                            "screenshot_note": note
+                            "screenshot_url": None
                         })
 
                 # 5. Bookmarks verification phase (dynamic, report-wide)
@@ -458,12 +435,6 @@ class PlaywrightFunctionalTester:
                         "state_changed": state_changed
                     })
                     
-                    # Capture screenshot with validation safeguard
-                    screenshot_filename = f"screenshot_{self.job_id}_bookmark_{bm_disp}.png"
-                    screenshot_path = os.path.join(self.screenshot_dir, screenshot_filename)
-                    is_valid, note = capture_with_validation(container_locator, screenshot_path)
-                    bm_screenshot_url = f"/api/reports/screenshots/{screenshot_filename}"
-                    
                     if not state_changed:
                         violations.append({
                             "target": f"Bookmark: {bm_disp} ({p_disp})",
@@ -471,8 +442,7 @@ class PlaywrightFunctionalTester:
                             "status": "fail",
                             "message": f"Bookmark '{bm_disp}' did not update visual state as expected on page '{p_disp}'.",
                             "suggested_fix": "Check the bookmark's captured display/data settings in the Bookmarks pane in Power BI Desktop.",
-                            "screenshot_url": bm_screenshot_url,
-                            "screenshot_note": note
+                            "screenshot_url": None
                         })
                     else:
                         violations.append({
@@ -481,8 +451,7 @@ class PlaywrightFunctionalTester:
                             "status": "pass",
                             "message": "Visual states updated correctly on bookmark activation.",
                             "suggested_fix": "",
-                            "screenshot_url": bm_screenshot_url,
-                            "screenshot_note": note
+                            "screenshot_url": None
                         })
                         
                     # Re-navigate to the original page if the bookmark changed pages to keep a stable baseline

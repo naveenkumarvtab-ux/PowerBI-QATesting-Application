@@ -193,15 +193,15 @@ def test_playwright_tester_bookmark_comparison():
     category_pass = [v for v in violations if v["target"] == "Bookmark: Category (Sales Overview)"][0]
     assert category_pass["status"] == "pass"
     assert category_pass["message"] == "Visual states updated correctly on bookmark activation."
-    assert category_pass["screenshot_url"] is not None
+    assert category_pass.get("screenshot_url") is None
     
     segment_pass = [v for v in violations if v["target"] == "Bookmark: Segment (Sales Overview)"][0]
     assert segment_pass["status"] == "pass"
     assert segment_pass["message"] == "Visual states updated correctly on bookmark activation."
-    assert segment_pass["screenshot_url"] is not None
+    assert segment_pass.get("screenshot_url") is None
     
     # Check FAIL bookmark (Failing Bookmark) does not change state
     failing_bookmark = [v for v in violations if v["target"] == "Bookmark: Failing Bookmark (Sales Overview)"][0]
     assert failing_bookmark["status"] == "fail"
     assert failing_bookmark["message"] == "Bookmark 'Failing Bookmark' did not update visual state as expected on page 'Sales Overview'."
-    assert failing_bookmark["screenshot_url"] is not None
+    assert failing_bookmark.get("screenshot_url") is None

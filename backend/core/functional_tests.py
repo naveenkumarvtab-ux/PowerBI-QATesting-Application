@@ -4,10 +4,59 @@ import json
 import base64
 from backend.config import Config
 
-# Tiny 1x1 PNG image as base64 to represent mock screenshots
-MOCK_SCREENSHOT_PNG = base64.b64decode(
-    b'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='
-)
+def generate_mock_screenshot(output_path, page_name="Sales Overview", bookmark_name="Category", status="pass"):
+    try:
+        from PIL import Image, ImageDraw
+        width, height = 640, 360
+        img = Image.new("RGB", (width, height), color=(241, 245, 249))
+        draw = ImageDraw.Draw(img)
+        
+        # 1. Top Power BI App Bar
+        draw.rectangle([(0, 0), (width, 36)], fill=(30, 41, 59))
+        draw.text((16, 10), f"Power BI — {page_name}", fill=(255, 255, 255))
+        
+        # Bookmark state badge on top right
+        pill_color = (22, 163, 74) if status == "pass" else (225, 29, 72)
+        pill_text = f"Bookmark: {bookmark_name} ({'Active & Verified' if status == 'pass' else 'State Unchanged'})"
+        draw.rounded_rectangle([(width - 270, 6), (width - 16, 30)], radius=6, fill=pill_color)
+        draw.text((width - 260, 10), pill_text, fill=(255, 255, 255))
+        
+        # 2. KPI Cards
+        draw.rounded_rectangle([(20, 52), (190, 130)], radius=8, fill=(255, 255, 255), outline=(226, 232, 240), width=1)
+        draw.text((32, 62), "Total Sales", fill=(100, 116, 139))
+        draw.text((32, 84), "$2,297,201", fill=(15, 23, 42))
+        
+        draw.rounded_rectangle([(210, 52), (380, 130)], radius=8, fill=(255, 255, 255), outline=(226, 232, 240), width=1)
+        draw.text((222, 62), "Total Orders", fill=(100, 116, 139))
+        draw.text((222, 84), "5,009", fill=(15, 23, 42))
+        
+        draw.rounded_rectangle([(400, 52), (620, 130)], radius=8, fill=(255, 255, 255), outline=(226, 232, 240), width=1)
+        draw.text((412, 62), "Profit Ratio", fill=(100, 116, 139))
+        draw.text((412, 84), "12.47%", fill=(15, 23, 42))
+        
+        # 3. Main Filtered Bar Chart
+        draw.rounded_rectangle([(20, 145), (380, 340)], radius=8, fill=(255, 255, 255), outline=(226, 232, 240), width=1)
+        draw.text((32, 155), f"Sales by {bookmark_name} (Filtered State)", fill=(30, 41, 59))
+        bars = [("Tech", 140, (59, 130, 246)), ("Furn", 110, (99, 102, 241)), ("Off", 85, (139, 92, 246)), ("Supp", 60, (14, 165, 233))]
+        for idx, (label, bar_h, color) in enumerate(bars):
+            x = 50 + idx * 78
+            draw.rounded_rectangle([(x, 310 - bar_h), (x + 46, 310)], radius=4, fill=color)
+            draw.text((x + 8, 315), label, fill=(100, 116, 139))
+            
+        # 4. Monthly Trend Line Chart
+        draw.rounded_rectangle([(400, 145), (620, 340)], radius=8, fill=(255, 255, 255), outline=(226, 232, 240), width=1)
+        draw.text((412, 155), "Monthly Sales Trend", fill=(30, 41, 59))
+        points = [(420, 290), (460, 260), (500, 275), (540, 210), (580, 220), (610, 190)]
+        draw.line(points, fill=(16, 185, 129), width=3)
+        for p in points:
+            draw.ellipse([(p[0]-3, p[1]-3), (p[0]+3, p[1]+3)], fill=(16, 185, 129))
+            
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        img.save(output_path, "PNG")
+    except Exception:
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        with open(output_path, "wb") as f:
+            f.write(b"")
 
 class PlaywrightFunctionalTester:
     def __init__(self, job_id, report_url, update_progress_callback=None, report_pages=None, page_bookmarks=None, page_slicers=None, workspace_id=None, report_id=None, api_client=None):
@@ -109,8 +158,7 @@ class PlaywrightFunctionalTester:
                 
                 screenshot_filename = f"screenshot_{self.job_id}_bookmark_{bmark_disp}.png"
                 screenshot_path = os.path.join(self.screenshot_dir, screenshot_filename)
-                with open(screenshot_path, "wb") as f:
-                    f.write(MOCK_SCREENSHOT_PNG)
+                generate_mock_screenshot(screenshot_path, page, bmark_disp, "fail" if not state_changed else "pass")
                 screenshot_url = f"/api/reports/screenshots/{screenshot_filename}"
                 
                 if not state_changed:

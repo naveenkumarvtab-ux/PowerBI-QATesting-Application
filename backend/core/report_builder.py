@@ -44,12 +44,16 @@ class ReportBuilder:
                 "functional"
             ]
             
+        # Normalize violations list to dicts
+        normalized_violations = [v.to_dict() if hasattr(v, "to_dict") else v for v in violations]
+            
         sections_dict = {}
         for cat_key in manifest:
             cat_name = categories_map.get(cat_key, cat_key.replace("_", " ").title())
             sections_dict[cat_key] = {
                 "category": cat_key,
                 "category_name": cat_name,
+                "title": cat_name,
                 "results": []
             }
             
@@ -62,12 +66,14 @@ class ReportBuilder:
         # Keep track of power query step name groupings
         pq_tables = {}
         
-        for v in violations:
+        for v in normalized_violations:
             cat = v.get("category", "functional")
             if cat not in sections_dict:
+                cat_title = categories_map.get(cat, cat.replace("_", " ").title())
                 sections_dict[cat] = {
                     "category": cat,
-                    "category_name": categories_map.get(cat, cat.replace("_", " ").title()),
+                    "category_name": cat_title,
+                    "title": cat_title,
                     "results": []
                 }
                 
@@ -188,11 +194,59 @@ class ReportBuilder:
                 layout = json.loads(layout_str)
             except Exception:
                 pass
-                
-        page_grouped_view = []
+
+        # Standalone sections (Power Query and Data Model)
+        standalone_sections = []
+        if "power_query_naming" in sections_dict:
+            standalone_sections.append(sections_dict["power_query_naming"])
+        if "data_model" in sections_dict:
+            standalone_sections.append(sections_dict["data_model"])
+
+        # Category view sections (excluding standalone sections)
+        category_sections = [
+            s for s in sections_dict.values()
+            if s["category"] not in ("power_query_naming", "data_model")
+        ]
+
+        # Extract field-to-page mappings from layout visual containers
+        measure_to_pages = {}
+        column_to_pages = {}
+
+        def record_field(field_name, page_name):
+            if not field_name or not isinstance(field_name, str):
+                return
+            cleaned = field_name.strip()
+            col_part = cleaned.split("[")[-1].rstrip("]") if "[" in cleaned else cleaned
+            for k in (cleaned.lower(), col_part.lower()):
+                if k not in measure_to_pages:
+                    measure_to_pages[k] = set()
+                measure_to_pages[k].add(page_name)
+                if k not in column_to_pages:
+                    column_to_pages[k] = set()
+                column_to_pages[k].add(page_name)
+
+        def scan_node_fields(node, page_name):
+            if isinstance(node, dict):
+                if "Property" in node and isinstance(node["Property"], str):
+                    record_field(node["Property"], page_name)
+                if "queryRef" in node and isinstance(node["queryRef"], str):
+                    q = node["queryRef"]
+                    q_val = q.split(".", 1)[1] if "." in q else q
+                    record_field(q, page_name)
+                    record_field(q_val, page_name)
+                if "displayName" in node and isinstance(node["displayName"], str):
+                    record_field(node["displayName"], page_name)
+                for v in node.values():
+                    scan_node_fields(v, page_name)
+            elif isinstance(node, list):
+                for item in node:
+                    scan_node_fields(item, page_name)
+
+        pages_list = []
+        pages_dict = {}
+
         if layout:
-            sections_list = layout.get("sections", [])
-            for sec in sections_list:
+            for sec in layout.get("sections", []):
                 is_hidden = False
                 if sec.get("visibility") == 1:
                     is_hidden = True
@@ -207,101 +261,131 @@ class ReportBuilder:
                             pass
                 if is_hidden:
                     continue
+
                 page_name = sec.get("displayName") or sec.get("name")
-                visuals_list = []
-                for idx, vc in enumerate(sec.get("visualContainers", [])):
-                    vc_id = vc.get("name")
-                    v_type = "Visual"
-                    v_title = None
-                    config_str = vc.get("config")
-                    if config_str:
+                
+                # Scan visual containers on this page
+                for vc in sec.get("visualContainers", []):
+                    cfg_str = vc.get("config")
+                    if cfg_str:
                         try:
-                            config = json.loads(config_str)
-                            single_visual = config.get("singleVisual", {})
-                            v_type = single_visual.get("visualType") or "Visual"
-                            title_objs = single_visual.get("vcObjects", {}).get("title", [])
-                            for tobj in title_objs:
-                                if isinstance(tobj, dict):
-                                    val_node = tobj.get("properties", {}).get("text")
-                                    if val_node:
-                                        if isinstance(val_node, dict) and "Literal" in val_node:
-                                            v_title = val_node["Literal"].get("Value", "").strip("'\"")
-                                            if v_title:
-                                                break
+                            cfg = json.loads(cfg_str)
+                            scan_node_fields(cfg, page_name)
                         except Exception:
                             pass
-                    if not v_title:
-                        v_title = f"{v_type} #{idx}"
-                    visuals_list.append({
-                        "visual_id": vc_id,
-                        "visual_type": v_type,
-                        "visual_title": v_title,
-                        "results": []
-                    })
-                page_grouped_view.append({
-                    "page_name": page_name,
-                    "page_checks": [],
-                    "visuals": visuals_list
-                })
-                
-            # Map violations to page_grouped_view
-            for v in violations:
-                status = v.get("status", "pass")
-                res_item = {
-                    "category": v.get("category"),
-                    "target": v.get("target", ""),
-                    "status": status,
-                    "message": v.get("message", ""),
-                    "suggested_fix": v.get("suggested_fix", ""),
-                    "screenshot_url": v.get("screenshot_url"),
-                    "screenshot_note": v.get("screenshot_note")
-                }
-                
-                # Retrieve explicit metadata
-                v_page = v.get("page_name")
-                v_vis_id = v.get("visual_id")
-                
-                # Heuristics: extract page name
-                if not v_page:
-                    t_str = v.get("target", "") + " " + v.get("message", "")
-                    for p_g in page_grouped_view:
-                        if p_g["page_name"].lower() in t_str.lower():
-                            v_page = p_g["page_name"]
-                            break
-                            
-                # Heuristics: extract visual_id
-                if v_page and not v_vis_id:
-                    msg_str = v.get("message", "") + " " + v.get("target", "")
-                    for p_g in page_grouped_view:
-                        if p_g["page_name"].lower() == v_page.lower():
-                            for vis in p_g["visuals"]:
-                                if (vis.get("visual_title") and vis["visual_title"].lower() in msg_str.lower()) or (vis.get("visual_id") and vis["visual_id"].lower() in msg_str.lower()):
-                                    v_vis_id = vis["visual_id"]
-                                    break
-                            break
-                            
-                if v_page:
-                    matched_page = None
-                    for p_g in page_grouped_view:
-                        if p_g["page_name"].lower() == v_page.lower():
-                            matched_page = p_g
-                            break
-                    if matched_page:
-                        if v_vis_id:
-                            matched_vis = None
-                            for vis in matched_page["visuals"]:
-                                if vis["visual_id"] == v_vis_id:
-                                    matched_vis = vis
-                                    break
-                            if matched_vis:
-                                matched_vis["results"].append(res_item)
-                            else:
-                                matched_page["page_checks"].append(res_item)
-                        else:
-                            matched_page["page_checks"].append(res_item)
+                    flt_str = vc.get("filters")
+                    if flt_str:
+                        try:
+                            flt = json.loads(flt_str)
+                            scan_node_fields(flt, page_name)
+                        except Exception:
+                            pass
 
-        # Return all compiled sections from the dict
-        sections = list(sections_dict.values())
+                # Scan page-level filters
+                pflt_str = sec.get("filters")
+                if pflt_str:
+                    try:
+                        pflt = json.loads(pflt_str)
+                        scan_node_fields(pflt, page_name)
+                    except Exception:
+                        pass
+
+                page_obj = {
+                    "page_name": page_name,
+                    "page_level_results": [],
+                    "visual_results": [],
+                    "dax_results": []
+                }
+                pages_dict[page_name.lower()] = page_obj
+                pages_list.append(page_obj)
+
+        not_used_on_any_page = []
+        report_level_checks = []
+
+        def extract_clean_target_name(target_str):
+            t = target_str
+            for prefix in ("Measure:", "Calculated Column:", "Complex Measure:", "Column:", "Table:"):
+                if t.startswith(prefix):
+                    t = t[len(prefix):].strip()
+            if "[" in t and "]" in t:
+                col_part = t.split("[")[-1].split("]")[0].strip()
+                return col_part.lower(), t.lower()
+            return t.strip().lower(), t.strip().lower()
+
+        # Map each violation into the appropriate bucket
+        for v in normalized_violations:
+            cat = v.get("category")
+            status = v.get("status", "pass")
+            target = v.get("target", "")
+            
+            res_item = {
+                "category": cat,
+                "target": target,
+                "status": status,
+                "message": v.get("message", ""),
+                "suggested_fix": v.get("suggested_fix", "")
+            }
+
+            # 1. Standalone sections (Power Query and Data Model) are kept out of page cards
+            if cat in ("power_query_naming", "data_model"):
+                continue
+
+            # 2. Unused measures and Unused columns -> "Not Used On Any Page"
+            if cat in ("unused_measures", "unused_columns"):
+                not_used_on_any_page.append(res_item)
+                continue
+
+            # 3. PDF and Excel Export Verifications -> "Report-Level Checks"
+            if cat in ("pdf_export", "excel_export"):
+                report_level_checks.append(res_item)
+                continue
+
+            # 4. DAX Measure Naming, Calculated Column Naming, DAX Complexity & VAR Check
+            if cat in ("dax_naming", "dax_calculated_columns", "dax_calculated_column_naming", "dax_complexity"):
+                short_name, full_name = extract_clean_target_name(target)
+                matched_pages = measure_to_pages.get(short_name) or measure_to_pages.get(full_name) or column_to_pages.get(short_name) or column_to_pages.get(full_name)
+                
+                if matched_pages:
+                    for p_name in matched_pages:
+                        p_key = p_name.lower()
+                        if p_key in pages_dict:
+                            pages_dict[p_key]["dax_results"].append(res_item)
+                else:
+                    # Not referenced on any visible page
+                    not_used_on_any_page.append(res_item)
+                continue
+
+            # 5. Page-level & Visual checks (Font, Alignment, Functional UI)
+            v_page = v.get("page_name")
+            v_vis_id = v.get("visual_id")
+            
+            # Heuristic page name resolution if not set explicitly
+            if not v_page:
+                t_str = target + " " + v.get("message", "")
+                for p_obj in pages_list:
+                    if p_obj["page_name"].lower() in t_str.lower():
+                        v_page = p_obj["page_name"]
+                        break
+                        
+            if v_page and v_page.lower() in pages_dict:
+                target_page = pages_dict[v_page.lower()]
+                # If visual-specific (e.g. font consistency, visual alignment, visual action)
+                if cat in ("font_consistency", "visual_alignment") or v_vis_id or "visual" in target.lower():
+                    target_page["visual_results"].append(res_item)
+                else:
+                    target_page["page_level_results"].append(res_item)
+            else:
+                report_level_checks.append(res_item)
+
+        # Structured Page-Grouped View Object
+        page_grouped_data = {
+            "standalone_sections": standalone_sections,
+            "pages": pages_list,
+            "unassigned": {
+                "not_used_on_any_page": not_used_on_any_page,
+                "report_level_checks": report_level_checks
+            }
+        }
         
         return {
             "job_id": job.id,
@@ -315,8 +399,9 @@ class ReportBuilder:
                 "failed": failed,
                 "warnings": warnings
             },
-            "sections": sections,
-            "page_grouped_view": page_grouped_view
+            "sections": category_sections,
+            "standalone_sections": standalone_sections,
+            "page_grouped_view": page_grouped_data
         }
 
     @classmethod

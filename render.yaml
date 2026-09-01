@@ -3,7 +3,7 @@ services:
   - type: web
     name: pbi-qa-backend
     runtime: docker
-    dockerContext: backend
+    dockerContext: .
     dockerfilePath: Dockerfile
     plan: free
     envVars:

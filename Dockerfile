@@ -21,11 +21,11 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Install Playwright and chromium browser system dependencies
 RUN playwright install --with-deps chromium
 
-# Copy application files into backend package
-COPY . /app/backend
+# Copy application files
+COPY . .
 
 # Setup directories for persistent data storage
-RUN mkdir -p /app/backend/storage/uploads /app/backend/storage/reports/screenshots
+RUN mkdir -p backend/storage/uploads backend/storage/reports/screenshots
 
 # Expose port (default 5000, overridden by Render's PORT env)
 EXPOSE 5000

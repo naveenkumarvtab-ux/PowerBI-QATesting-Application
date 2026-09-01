@@ -10,8 +10,8 @@ def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
     
-    # Enable CORS for frontend Vite dev server (port 5173) and any other domains
-    CORS(app, resources={r"/api/*": {"origins": "*"}})
+    # Enable CORS globally for all origins (local dev and Render deployment)
+    CORS(app, resources={r"/*": {"origins": "*"}})
     
     # Initialize SQLAlchemy database engine
     connect_args = {"check_same_thread": False} if "sqlite" in Config.DATABASE_URL else {}

@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { FileUp, File, AlertCircle, Loader2 } from 'lucide-react';
@@ -12,6 +12,11 @@ export default function PbixUpload() {
   
   const navigate = useNavigate();
   const fileInputRef = useRef(null);
+
+  // Pre-warm backend when page opens (wakes up sleeping Render instance)
+  useEffect(() => {
+    axios.get('/api/health').catch(() => {});
+  }, []);
 
   const handleDrag = (e) => {
     e.preventDefault();
@@ -58,20 +63,20 @@ export default function PbixUpload() {
     
     const formData = new FormData();
     formData.append('file', file);
-    // Automatically enable all tests
     formData.append('run_functional', 'true');
     formData.append('run_pdf', 'true');
     formData.append('run_excel', 'true');
-    formData.append('auth_mode', 'service_principal'); // Default to service principal AAD auth
+    formData.append('auth_mode', 'service_principal');
     
     try {
+      // Do not manually set Content-Type header so Axios generates the multipart boundary automatically
       const response = await axios.post('/api/pbix/upload', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data'
-        },
+        timeout: 180000,
         onUploadProgress: (progressEvent) => {
-          const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-          setUploadProgress(percentCompleted);
+          if (progressEvent.total) {
+            const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+            setUploadProgress(percentCompleted);
+          }
         }
       });
       
@@ -79,8 +84,15 @@ export default function PbixUpload() {
       navigate(`/jobs/${jobId}/status`);
       
     } catch (err) {
-      console.error(err);
-      setError(err.response?.data?.error || "Failed to upload file and execute tests.");
+      console.error("Upload error:", err);
+      const serverError = err.response?.data?.error || err.response?.data?.message;
+      if (serverError) {
+        setError(serverError);
+      } else if (err.code === 'ECONNABORTED' || err.message?.includes('timeout') || err.message?.includes('Network Error')) {
+        setError("Connection timeout or network error. The Render backend server may be waking up from sleep. Please wait 15 seconds and try again.");
+      } else {
+        setError("Failed to upload file and execute tests. Please try again.");
+      }
       setUploading(false);
       setUploadProgress(0);
     }

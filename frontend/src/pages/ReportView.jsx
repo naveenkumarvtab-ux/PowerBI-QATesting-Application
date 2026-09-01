@@ -5,7 +5,7 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer 
 } from 'recharts';
 import { 
-  Download, ArrowLeft, CheckCircle2, AlertTriangle, XCircle, ChevronDown, ChevronUp, AlertCircle, Loader2, Info, Layers, FileCode, CheckSquare
+  Download, ArrowLeft, CheckCircle2, AlertTriangle, XCircle, ChevronDown, ChevronUp, AlertCircle, Loader2, Info, Layers, FileCode, CheckSquare, X
 } from 'lucide-react';
 
 export default function ReportView() {
@@ -18,6 +18,7 @@ export default function ReportView() {
   const [collapsed, setCollapsed] = useState({});
   // Filters
   const [statusFilter, setStatusFilter] = useState('all'); // all, pass, warning, fail
+  const [categoryFilter, setCategoryFilter] = useState('all'); // all, or specific category key
 
   const [activeTab, setActiveTab] = useState('page'); // 'page' (default) or 'category'
   const [tableCollapsed, setTableCollapsed] = useState({});
@@ -123,6 +124,35 @@ export default function ReportView() {
   const categorySections = report.sections || [];
   const allSectionsForChart = [...standaloneSections, ...categorySections];
 
+  // Standard ordered category list
+  const allCategoriesList = [
+    { key: 'power_query_naming', name: 'Power Query Step Naming' },
+    { key: 'dax_naming', name: 'DAX Measure Naming' },
+    { key: 'dax_calculated_columns', name: 'DAX Calculated Column Naming' },
+    { key: 'unused_measures', name: 'Unused Measures Check' },
+    { key: 'unused_columns', name: 'Unused Columns Check' },
+    { key: 'data_model', name: 'Data Model Alignment' },
+    { key: 'font_consistency', name: 'Font Consistency Check' },
+    { key: 'visual_alignment', name: 'Visual Alignment Check' },
+    { key: 'functional', name: 'Functional UI Testing' },
+    { key: 'dax_complexity', name: 'DAX Complexity & VAR Check' },
+    { key: 'pdf_export', name: 'PDF Export Verification' },
+    { key: 'excel_export', name: 'Excel Export Verification' }
+  ];
+
+  const getCategoryStats = (catKey) => {
+    let matchedResults = [];
+    allSectionsForChart.forEach(sec => {
+      if (sec.category === catKey || (catKey === 'dax_calculated_columns' && sec.category === 'dax_calculated_column_naming')) {
+        matchedResults = [...matchedResults, ...(sec.results || [])];
+      }
+    });
+    const failed = matchedResults.filter(r => r.status === 'fail').length;
+    const warnings = matchedResults.filter(r => r.status === 'warning').length;
+    const passed = matchedResults.filter(r => r.status === 'pass').length;
+    return { count: matchedResults.length, failed, warnings, passed };
+  };
+
   // Prepare chart data
   const chartData = allSectionsForChart.map(sec => {
     const results = sec.results || [];
@@ -143,6 +173,20 @@ export default function ReportView() {
   const unassigned = pageGroupedView.unassigned || {};
   const notUsedOnAnyPage = unassigned.not_used_on_any_page || [];
   const reportLevelChecks = unassigned.report_level_checks || [];
+
+  // Filter helper functions
+  const matchesCategory = (resCategory) => {
+    if (categoryFilter === 'all') return true;
+    if (categoryFilter === 'dax_calculated_columns' || categoryFilter === 'dax_calculated_column_naming') {
+      return resCategory === 'dax_calculated_columns' || resCategory === 'dax_calculated_column_naming';
+    }
+    return resCategory === categoryFilter;
+  };
+
+  const matchesStatus = (resStatus) => {
+    if (statusFilter === 'all') return true;
+    return resStatus === statusFilter;
+  };
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
@@ -264,212 +308,217 @@ export default function ReportView() {
       {/* ========================================================================= */}
       {/* 1. STANDALONE SECTIONS (Always Pinned at the Top in Both Views)             */}
       {/* ========================================================================= */}
-      <div className="space-y-4 pt-2">
-        <div className="flex items-center gap-2">
-          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-            📌 Model & Dataset Level Audits (Global Standards)
-          </span>
-        </div>
+      {standaloneSections.some(sec => matchesCategory(sec.category)) && (
+        <div className="space-y-4 pt-2">
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+              📌 Model & Dataset Level Audits (Global Standards)
+            </span>
+          </div>
 
-        {standaloneSections.map(sec => {
-          const filteredResults = (sec.results || []).filter(res => {
-            if (statusFilter === 'all') return true;
-            return res.status === statusFilter;
-          });
-          
-          const isCollapsed = collapsed[sec.category];
+          {standaloneSections.map(sec => {
+            if (!matchesCategory(sec.category)) return null;
 
-          return (
-            <div 
-              key={sec.category}
-              id={`sec-${sec.category}`}
-              className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden scroll-mt-6"
-            >
-              {/* Header */}
+            const filteredResults = (sec.results || []).filter(res => {
+              return matchesStatus(res.status);
+            });
+            
+            if (filteredResults.length === 0 && statusFilter !== 'all') return null;
+
+            const isCollapsed = collapsed[sec.category];
+
+            return (
               <div 
-                onClick={() => toggleCollapse(sec.category)}
-                className="bg-slate-50 px-5 py-4 border-b border-slate-200 flex justify-between items-center cursor-pointer hover:bg-slate-100/70 transition-colors select-none"
+                key={sec.category}
+                id={`sec-${sec.category}`}
+                className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden scroll-mt-6"
               >
-                <div className="flex items-center gap-2">
-                  <h3 className="font-bold text-slate-800 text-sm">{sec.category_name || sec.title}</h3>
-                  <span className="bg-slate-200 text-slate-700 text-xs px-2 py-0.5 rounded-full font-semibold">
-                    {filteredResults.length} {filteredResults.length === 1 ? 'item' : 'items'}
-                  </span>
-                  <span className="text-[10px] bg-indigo-50 text-indigo-700 font-semibold px-2 py-0.5 rounded border border-indigo-200">
-                    Standalone Model Check
-                  </span>
-                </div>
-                {isCollapsed ? <ChevronDown className="h-4 w-4 text-slate-500" /> : <ChevronUp className="h-4 w-4 text-slate-500" />}
-              </div>
-
-              {/* Content */}
-              {!isCollapsed && (
-                <div className="divide-y divide-slate-100 px-5">
-                  {sec.excluded_note && (
-                    <div className="my-3 p-2.5 bg-slate-50 border border-slate-200/80 text-slate-600 rounded-lg text-xs leading-relaxed flex items-center gap-2">
-                      <Info className="h-4 w-4 text-slate-400 flex-shrink-0" />
-                      <span>{sec.excluded_note}</span>
-                    </div>
-                  )}
-
-                  {/* Power Query Step Naming Table-Wise Rendering */}
-                  {sec.category === 'power_query_naming' && sec.tables ? (
-                    <div className="space-y-4 py-4">
-                      {sec.tables.map(table => {
-                        const filteredTableResults = table.results.filter(res => {
-                          if (statusFilter === 'all') return true;
-                          return res.status === statusFilter;
-                        });
-                        if (filteredTableResults.length === 0 && statusFilter !== 'all') return null;
-
-                        const isTCollapsed = tableCollapsed[table.table_name] !== undefined 
-                          ? tableCollapsed[table.table_name] 
-                          : !table.results.some(r => r.status === 'fail' || r.status === 'warning');
-
-                        return (
-                          <div key={table.table_name} className="border border-slate-200 rounded-lg overflow-hidden">
-                            <div 
-                              onClick={() => setTableCollapsed(prev => ({...prev, [table.table_name]: !isTCollapsed}))}
-                              className="bg-slate-50/50 px-4 py-2.5 flex justify-between items-center cursor-pointer hover:bg-slate-50 transition-colors select-none"
-                            >
-                              <div className="flex items-center gap-2">
-                                <span className="font-bold text-slate-800 text-xs font-mono">{table.table_name}</span>
-                                <span className="text-[10px] text-slate-500 font-medium">({filteredTableResults.length} steps)</span>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                {table.summary.failed > 0 && <span className="bg-rose-50 text-rose-700 border border-rose-200 text-[10px] font-bold px-1.5 py-0.5 rounded">{table.summary.failed} Failed</span>}
-                                {table.summary.warnings > 0 && <span className="bg-amber-50 text-amber-700 border border-amber-200 text-[10px] font-bold px-1.5 py-0.5 rounded">{table.summary.warnings} Warnings</span>}
-                                {table.summary.passed > 0 && <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold px-1.5 py-0.5 rounded">{table.summary.passed} Passed</span>}
-                                {isTCollapsed ? <ChevronDown className="h-3.5 w-3.5 text-slate-400" /> : <ChevronUp className="h-3.5 w-3.5 text-slate-400" />}
-                              </div>
-                            </div>
-                            {!isTCollapsed && (
-                              <div className="divide-y divide-slate-100 px-4 bg-white">
-                                {filteredTableResults.map((res, rIdx) => (
-                                  <div key={rIdx} className="py-3 flex items-start justify-between gap-4">
-                                    <div className="space-y-1">
-                                      <h5 className="font-bold text-slate-800 text-xs font-mono">{res.target}</h5>
-                                      <p className="text-xs text-slate-600 leading-relaxed">{res.message}</p>
-                                    </div>
-                                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold tracking-wider uppercase border flex-shrink-0 flex items-center gap-1 ${res.status === 'pass' && 'bg-emerald-50 text-emerald-800 border-emerald-200'} ${res.status === 'warning' && 'bg-amber-50 text-amber-800 border-amber-200'} ${res.status === 'fail' && 'bg-rose-50 text-rose-800 border-rose-200'}`}>
-                                      {res.status}
-                                    </span>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    /* Default Flat List for Data Model */
-                    <div className="divide-y divide-slate-100 py-1">
-                      {filteredResults.map((res, rIdx) => (
-                        <div key={rIdx} className="py-3.5 flex items-start justify-between gap-4">
-                          <div className="space-y-1">
-                            <h4 className="font-bold text-slate-800 text-xs font-mono">{res.target}</h4>
-                            <p className="text-xs text-slate-600 leading-relaxed">{res.message}</p>
-                            {res.suggested_fix && (
-                              <div className="mt-1.5 p-2 bg-slate-50 border border-slate-200 rounded text-[11px] leading-relaxed">
-                                <strong className="font-bold text-slate-700">Suggested Fix: </strong>
-                                <span className="text-slate-600">{res.suggested_fix}</span>
-                              </div>
-                            )}
-                          </div>
-                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold tracking-wider uppercase border flex-shrink-0 flex items-center gap-1 ${
-                            res.status === 'pass' && 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                          } ${
-                            res.status === 'warning' && 'bg-amber-50 text-amber-800 border-amber-200'
-                          } ${
-                            res.status === 'fail' && 'bg-rose-50 text-rose-800 border-rose-200'
-                          }`}>
-                            {res.status}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Navigation Shortcuts */}
-      <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 shadow-sm space-y-2">
-        <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
-          🎯 Quick Navigation Shortcuts ({activeTab === 'page' ? 'Report Pages' : 'Categories'})
-        </span>
-        <div className="flex flex-wrap gap-2">
-          {activeTab === 'page' ? (
-            <>
-              {pagesList.map(page => {
-                const allPageItems = [
-                  ...(page.dax_results || []),
-                  ...(page.page_level_results || []),
-                  ...(page.visual_results || [])
-                ];
-                const failed = allPageItems.filter(r => r.status === 'fail').length;
-                const warnings = allPageItems.filter(r => r.status === 'warning').length;
-
-                return (
-                  <button
-                    key={page.page_name}
-                    type="button"
-                    onClick={() => scrollToCard(`page-card-${page.page_name}`)}
-                    className="px-3 py-1.5 bg-white border border-slate-200 hover:border-indigo-500 hover:text-indigo-600 rounded-lg text-xs font-semibold text-slate-700 shadow-sm transition-all flex items-center gap-1.5"
-                  >
-                    <span>{page.page_name}</span>
-                    <span className="flex items-center gap-1">
-                      {failed > 0 && <span className="h-2 w-2 rounded-full bg-rose-500"></span>}
-                      {warnings > 0 && <span className="h-2 w-2 rounded-full bg-amber-500"></span>}
-                      {failed === 0 && warnings === 0 && <span className="h-2 w-2 rounded-full bg-emerald-500"></span>}
-                    </span>
-                  </button>
-                );
-              })}
-              <button
-                type="button"
-                onClick={() => scrollToCard('card-not-used-on-any-page')}
-                className="px-3 py-1.5 bg-white border border-slate-200 hover:border-indigo-500 hover:text-indigo-600 rounded-lg text-xs font-semibold text-slate-700 shadow-sm transition-all flex items-center gap-1.5"
-              >
-                <span>Not Used On Any Page</span>
-                <span className="text-[10px] bg-slate-100 text-slate-600 px-1.5 rounded">{notUsedOnAnyPage.length}</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => scrollToCard('card-report-level-checks')}
-                className="px-3 py-1.5 bg-white border border-slate-200 hover:border-indigo-500 hover:text-indigo-600 rounded-lg text-xs font-semibold text-slate-700 shadow-sm transition-all flex items-center gap-1.5"
-              >
-                <span>Report-Level Checks</span>
-                <span className="text-[10px] bg-slate-100 text-slate-600 px-1.5 rounded">{reportLevelChecks.length}</span>
-              </button>
-            </>
-          ) : (
-            categorySections.map(sec => {
-              const passed = (sec.results || []).filter(r => r.status === 'pass').length;
-              const warnings = (sec.results || []).filter(r => r.status === 'warning').length;
-              const failed = (sec.results || []).filter(r => r.status === 'fail').length;
-              
-              return (
-                <button
-                  key={sec.category}
-                  type="button"
-                  onClick={() => scrollToCard(`category-sec-${sec.category}`)}
-                  className="px-3 py-1.5 bg-white border border-slate-200 hover:border-indigo-500 hover:text-indigo-600 rounded-lg text-xs font-semibold text-slate-700 shadow-sm transition-all flex items-center gap-1.5"
+                {/* Header */}
+                <div 
+                  onClick={() => toggleCollapse(sec.category)}
+                  className="bg-slate-50 px-5 py-4 border-b border-slate-200 flex justify-between items-center cursor-pointer hover:bg-slate-100/70 transition-colors select-none"
                 >
-                  <span>{sec.category_name || sec.title}</span>
-                  <span className="flex items-center gap-1">
-                    {failed > 0 && <span className="h-2 w-2 rounded-full bg-rose-500"></span>}
-                    {warnings > 0 && <span className="h-2 w-2 rounded-full bg-amber-500"></span>}
-                    {failed === 0 && warnings === 0 && <span className="h-2 w-2 rounded-full bg-emerald-500"></span>}
-                  </span>
-                </button>
-              );
-            })
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-bold text-slate-800 text-sm">{sec.category_name || sec.title}</h3>
+                    <span className="bg-slate-200 text-slate-700 text-xs px-2 py-0.5 rounded-full font-semibold">
+                      {filteredResults.length} {filteredResults.length === 1 ? 'item' : 'items'}
+                    </span>
+                    <span className="text-[10px] bg-indigo-50 text-indigo-700 font-semibold px-2 py-0.5 rounded border border-indigo-200">
+                      Standalone Model Check
+                    </span>
+                  </div>
+                  {isCollapsed ? <ChevronDown className="h-4 w-4 text-slate-500" /> : <ChevronUp className="h-4 w-4 text-slate-500" />}
+                </div>
+
+                {/* Content */}
+                {!isCollapsed && (
+                  <div className="divide-y divide-slate-100 px-5">
+                    {sec.excluded_note && (
+                      <div className="my-3 p-2.5 bg-slate-50 border border-slate-200/80 text-slate-600 rounded-lg text-xs leading-relaxed flex items-center gap-2">
+                        <Info className="h-4 w-4 text-slate-400 flex-shrink-0" />
+                        <span>{sec.excluded_note}</span>
+                      </div>
+                    )}
+
+                    {/* Power Query Step Naming Table-Wise Rendering */}
+                    {sec.category === 'power_query_naming' && sec.tables ? (
+                      <div className="space-y-4 py-4">
+                        {sec.tables.map(table => {
+                          const filteredTableResults = table.results.filter(res => {
+                            return matchesStatus(res.status);
+                          });
+                          if (filteredTableResults.length === 0 && statusFilter !== 'all') return null;
+
+                          const isTCollapsed = tableCollapsed[table.table_name] !== undefined 
+                            ? tableCollapsed[table.table_name] 
+                            : !table.results.some(r => r.status === 'fail' || r.status === 'warning');
+
+                          return (
+                            <div key={table.table_name} className="border border-slate-200 rounded-lg overflow-hidden">
+                              <div 
+                                onClick={() => setTableCollapsed(prev => ({...prev, [table.table_name]: !isTCollapsed}))}
+                                className="bg-slate-50/50 px-4 py-2.5 flex justify-between items-center cursor-pointer hover:bg-slate-50 transition-colors select-none"
+                              >
+                                <div className="flex items-center gap-2">
+                                  <span className="font-bold text-slate-800 text-xs font-mono">{table.table_name}</span>
+                                  <span className="text-[10px] text-slate-500 font-medium">({filteredTableResults.length} steps)</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  {table.summary.failed > 0 && <span className="bg-rose-50 text-rose-700 border border-rose-200 text-[10px] font-bold px-1.5 py-0.5 rounded">{table.summary.failed} Failed</span>}
+                                  {table.summary.warnings > 0 && <span className="bg-amber-50 text-amber-700 border border-amber-200 text-[10px] font-bold px-1.5 py-0.5 rounded">{table.summary.warnings} Warnings</span>}
+                                  {table.summary.passed > 0 && <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold px-1.5 py-0.5 rounded">{table.summary.passed} Passed</span>}
+                                  {isTCollapsed ? <ChevronDown className="h-3.5 w-3.5 text-slate-400" /> : <ChevronUp className="h-3.5 w-3.5 text-slate-400" />}
+                                </div>
+                              </div>
+                              {!isTCollapsed && (
+                                <div className="divide-y divide-slate-100 px-4 bg-white">
+                                  {filteredTableResults.map((res, rIdx) => (
+                                    <div key={rIdx} className="py-3 flex items-start justify-between gap-4">
+                                      <div className="space-y-1">
+                                        <h5 className="font-bold text-slate-800 text-xs font-mono">{res.target}</h5>
+                                        <p className="text-xs text-slate-600 leading-relaxed">{res.message}</p>
+                                        {res.suggested_fix && (
+                                          <div className="mt-1.5 p-2 bg-slate-50 border border-slate-200 rounded text-[11px] leading-relaxed">
+                                            <strong className="font-bold text-slate-700">Suggested Fix: </strong>
+                                            <span className="text-slate-600">{res.suggested_fix}</span>
+                                          </div>
+                                        )}
+                                      </div>
+                                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold tracking-wider uppercase border flex-shrink-0 flex items-center gap-1 ${res.status === 'pass' && 'bg-emerald-50 text-emerald-800 border-emerald-200'} ${res.status === 'warning' && 'bg-amber-50 text-amber-800 border-amber-200'} ${res.status === 'fail' && 'bg-rose-50 text-rose-800 border-rose-200'}`}>
+                                        {res.status}
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      /* Default Flat List for Data Model */
+                      <div className="divide-y divide-slate-100 py-1">
+                        {filteredResults.map((res, rIdx) => (
+                          <div key={rIdx} className="py-3.5 flex items-start justify-between gap-4">
+                            <div className="space-y-1">
+                              <h4 className="font-bold text-slate-800 text-xs font-mono">{res.target}</h4>
+                              <p className="text-xs text-slate-600 leading-relaxed">{res.message}</p>
+                              {res.suggested_fix && (
+                                <div className="mt-1.5 p-2 bg-slate-50 border border-slate-200 rounded text-[11px] leading-relaxed">
+                                  <strong className="font-bold text-slate-700">Suggested Fix: </strong>
+                                  <span className="text-slate-600">{res.suggested_fix}</span>
+                                </div>
+                              )}
+                            </div>
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold tracking-wider uppercase border flex-shrink-0 flex items-center gap-1 ${
+                              res.status === 'pass' && 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                            } ${
+                              res.status === 'warning' && 'bg-amber-50 text-amber-800 border-amber-200'
+                            } ${
+                              res.status === 'fail' && 'bg-rose-50 text-rose-800 border-rose-200'
+                            }`}>
+                              {res.status}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* QUICK NAVIGATION SHORTCUTS & CATEGORY FILTER BAR */}
+      <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 shadow-sm space-y-3">
+        <div className="flex items-center justify-between">
+          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+            <span>🎯</span> QUICK NAVIGATION SHORTCUTS (CATEGORIES)
+          </span>
+          {categoryFilter !== 'all' && (
+            <button
+              onClick={() => setCategoryFilter('all')}
+              className="text-xs text-indigo-600 font-bold hover:underline flex items-center gap-1"
+            >
+              <X className="h-3.5 w-3.5" />
+              Reset Filter (Showing All)
+            </button>
           )}
+        </div>
+        
+        <div className="flex flex-wrap gap-2">
+          {/* All Categories Option */}
+          <button
+            type="button"
+            onClick={() => setCategoryFilter('all')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold shadow-sm transition-all flex items-center gap-1.5 ${
+              categoryFilter === 'all'
+                ? 'bg-slate-900 text-white font-bold'
+                : 'bg-white border border-slate-200 text-slate-700 hover:border-slate-400'
+            }`}
+          >
+            All Categories
+          </button>
+
+          {/* 12 Individual Category Filter Buttons */}
+          {allCategoriesList.map(cat => {
+            const stats = getCategoryStats(cat.key);
+            const isSelected = categoryFilter === cat.key || 
+              (cat.key === 'dax_calculated_columns' && categoryFilter === 'dax_calculated_column_naming');
+
+            return (
+              <button
+                key={cat.key}
+                type="button"
+                onClick={() => {
+                  setCategoryFilter(prev => (prev === cat.key ? 'all' : cat.key));
+                  if (activeTab === 'category') {
+                    scrollToCard(`category-sec-${cat.key}`);
+                  }
+                }}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold shadow-sm transition-all flex items-center gap-1.5 ${
+                  isSelected
+                    ? 'bg-indigo-600 text-white font-bold ring-2 ring-indigo-300'
+                    : 'bg-white border border-slate-200 hover:border-indigo-500 hover:text-indigo-600 text-slate-700'
+                }`}
+              >
+                <span>{cat.name}</span>
+                <span className="flex items-center gap-1">
+                  {stats.failed > 0 && (
+                    <span className={`h-2 w-2 rounded-full ${isSelected ? 'bg-rose-300' : 'bg-rose-500'}`}></span>
+                  )}
+                  {stats.warnings > 0 && (
+                    <span className={`h-2 w-2 rounded-full ${isSelected ? 'bg-amber-300' : 'bg-amber-500'}`}></span>
+                  )}
+                  {stats.failed === 0 && stats.warnings === 0 && (
+                    <span className={`h-2 w-2 rounded-full ${isSelected ? 'bg-emerald-300' : 'bg-emerald-500'}`}></span>
+                  )}
+                </span>
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -547,12 +596,12 @@ export default function ReportView() {
           <div className="space-y-6">
             {/* Real Report Pages */}
             {pagesList.map(page => {
-              const filteredDax = (page.dax_results || []).filter(r => statusFilter === 'all' || r.status === statusFilter);
-              const filteredPageLevel = (page.page_level_results || []).filter(r => statusFilter === 'all' || r.status === statusFilter);
-              const filteredVisuals = (page.visual_results || []).filter(r => statusFilter === 'all' || r.status === statusFilter);
+              const filteredDax = (page.dax_results || []).filter(r => matchesCategory(r.category) && matchesStatus(r.status));
+              const filteredPageLevel = (page.page_level_results || []).filter(r => matchesCategory(r.category) && matchesStatus(r.status));
+              const filteredVisuals = (page.visual_results || []).filter(r => matchesCategory(r.category) && matchesStatus(r.status));
 
               const totalFiltered = filteredDax.length + filteredPageLevel.length + filteredVisuals.length;
-              if (totalFiltered === 0 && statusFilter !== 'all') return null;
+              if (totalFiltered === 0 && (statusFilter !== 'all' || categoryFilter !== 'all')) return null;
 
               const isPageCollapsed = pageCollapsed[page.page_name] || false;
               const allPageItems = [...(page.dax_results || []), ...(page.page_level_results || []), ...(page.visual_results || [])];
@@ -745,8 +794,8 @@ export default function ReportView() {
 
             {/* Special Bucket 1: Not Used On Any Page */}
             {notUsedOnAnyPage.length > 0 && (() => {
-              const filteredNotUsed = notUsedOnAnyPage.filter(r => statusFilter === 'all' || r.status === statusFilter);
-              if (filteredNotUsed.length === 0 && statusFilter !== 'all') return null;
+              const filteredNotUsed = notUsedOnAnyPage.filter(r => matchesCategory(r.category) && matchesStatus(r.status));
+              if (filteredNotUsed.length === 0 && (statusFilter !== 'all' || categoryFilter !== 'all')) return null;
 
               const nuFailed = notUsedOnAnyPage.filter(r => r.status === 'fail').length;
               const nuWarnings = notUsedOnAnyPage.filter(r => r.status === 'warning').length;
@@ -835,8 +884,8 @@ export default function ReportView() {
 
             {/* Special Bucket 2: Report-Level Checks */}
             {reportLevelChecks.length > 0 && (() => {
-              const filteredReportLevel = reportLevelChecks.filter(r => statusFilter === 'all' || r.status === statusFilter);
-              if (filteredReportLevel.length === 0 && statusFilter !== 'all') return null;
+              const filteredReportLevel = reportLevelChecks.filter(r => matchesCategory(r.category) && matchesStatus(r.status));
+              if (filteredReportLevel.length === 0 && (statusFilter !== 'all' || categoryFilter !== 'all')) return null;
 
               return (
                 <div 
@@ -901,12 +950,13 @@ export default function ReportView() {
         {/* TAB 2: CATEGORY VIEW (Secondary Toggle)                                   */}
         {/* ========================================================================= */}
         {activeTab === 'category' && categorySections.map(sec => {
+          if (!matchesCategory(sec.category)) return null;
+
           const filteredResults = (sec.results || []).filter(res => {
-            if (statusFilter === 'all') return true;
-            return res.status === statusFilter;
+            return matchesStatus(res.status);
           });
           
-          if (filteredResults.length === 0 && statusFilter !== 'all') return null;
+          if (filteredResults.length === 0 && (statusFilter !== 'all' || categoryFilter !== 'all')) return null;
 
           const isCollapsed = collapsed[sec.category];
 

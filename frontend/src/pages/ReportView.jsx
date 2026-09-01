@@ -19,6 +19,7 @@ export default function ReportView() {
   // Filters
   const [statusFilter, setStatusFilter] = useState('all'); // all, pass, warning, fail
   const [categoryFilter, setCategoryFilter] = useState('all'); // all, or specific category key
+  const [selectedPage, setSelectedPage] = useState('all'); // 'all', page_name, 'not_used', 'report_level'
 
   const [activeTab, setActiveTab] = useState('page'); // 'page' (default) or 'category'
   const [tableCollapsed, setTableCollapsed] = useState({});
@@ -51,10 +52,14 @@ export default function ReportView() {
         const initialPageCollapsed = {};
         const pages = data.page_grouped_view?.pages || (Array.isArray(data.page_grouped_view) ? data.page_grouped_view : []);
         pages.forEach((p) => {
-          // Keep all pages expanded by default
           initialPageCollapsed[p.page_name] = false;
         });
         setPageCollapsed(initialPageCollapsed);
+
+        // Default selected page to the first page if available
+        if (pages.length > 0) {
+          setSelectedPage(pages[0].page_name);
+        }
 
       } catch (err) {
         console.error(err);
@@ -140,13 +145,51 @@ export default function ReportView() {
     { key: 'excel_export', name: 'Excel Export Verification' }
   ];
 
-  const getCategoryStats = (catKey) => {
+  const pageGroupedView = report.page_grouped_view || {};
+  const pagesList = pageGroupedView.pages || (Array.isArray(pageGroupedView) ? pageGroupedView : []);
+  const unassigned = pageGroupedView.unassigned || {};
+  const notUsedOnAnyPage = unassigned.not_used_on_any_page || [];
+  const reportLevelChecks = unassigned.report_level_checks || [];
+
+  // Filter helper functions
+  const matchesCategory = (resCategory, specificCat = null) => {
+    const targetCat = specificCat || categoryFilter;
+    if (targetCat === 'all') return true;
+    if (targetCat === 'dax_calculated_columns' || targetCat === 'dax_calculated_column_naming') {
+      return resCategory === 'dax_calculated_columns' || resCategory === 'dax_calculated_column_naming';
+    }
+    return resCategory === targetCat;
+  };
+
+  const matchesStatus = (resStatus) => {
+    if (statusFilter === 'all') return true;
+    return resStatus === statusFilter;
+  };
+
+  // Dynamic category stats based on the currently selected page (or all pages)
+  const getPageCategoryStats = (catKey) => {
     let matchedResults = [];
-    allSectionsForChart.forEach(sec => {
-      if (sec.category === catKey || (catKey === 'dax_calculated_columns' && sec.category === 'dax_calculated_column_naming')) {
-        matchedResults = [...matchedResults, ...(sec.results || [])];
+    if (selectedPage === 'all' || activeTab === 'category') {
+      allSectionsForChart.forEach(sec => {
+        if (sec.category === catKey || (catKey === 'dax_calculated_columns' && sec.category === 'dax_calculated_column_naming')) {
+          matchedResults = [...matchedResults, ...(sec.results || [])];
+        }
+      });
+    } else if (selectedPage === 'not_used') {
+      matchedResults = notUsedOnAnyPage.filter(r => matchesCategory(r.category, catKey));
+    } else if (selectedPage === 'report_level') {
+      matchedResults = reportLevelChecks.filter(r => matchesCategory(r.category, catKey));
+    } else {
+      const curPage = pagesList.find(p => p.page_name === selectedPage);
+      if (curPage) {
+        const items = [
+          ...(curPage.dax_results || []),
+          ...(curPage.page_level_results || []),
+          ...(curPage.visual_results || [])
+        ];
+        matchedResults = items.filter(r => matchesCategory(r.category, catKey));
       }
-    });
+    }
     const failed = matchedResults.filter(r => r.status === 'fail').length;
     const warnings = matchedResults.filter(r => r.status === 'warning').length;
     const passed = matchedResults.filter(r => r.status === 'pass').length;
@@ -167,26 +210,6 @@ export default function ReportView() {
       Failed: failed
     };
   });
-
-  const pageGroupedView = report.page_grouped_view || {};
-  const pagesList = pageGroupedView.pages || (Array.isArray(pageGroupedView) ? pageGroupedView : []);
-  const unassigned = pageGroupedView.unassigned || {};
-  const notUsedOnAnyPage = unassigned.not_used_on_any_page || [];
-  const reportLevelChecks = unassigned.report_level_checks || [];
-
-  // Filter helper functions
-  const matchesCategory = (resCategory) => {
-    if (categoryFilter === 'all') return true;
-    if (categoryFilter === 'dax_calculated_columns' || categoryFilter === 'dax_calculated_column_naming') {
-      return resCategory === 'dax_calculated_columns' || resCategory === 'dax_calculated_column_naming';
-    }
-    return resCategory === categoryFilter;
-  };
-
-  const matchesStatus = (resStatus) => {
-    if (statusFilter === 'all') return true;
-    return resStatus === statusFilter;
-  };
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
@@ -451,11 +474,129 @@ export default function ReportView() {
         </div>
       )}
 
-      {/* QUICK NAVIGATION SHORTCUTS & CATEGORY FILTER BAR */}
+      {/* ========================================================================= */}
+      {/* STEP 1: SELECT REPORT PAGE                                                */}
+      {/* ========================================================================= */}
+      {activeTab === 'page' && (
+        <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 shadow-sm space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+              <Layers className="h-3.5 w-3.5 text-indigo-600" />
+              STEP 1: SELECT REPORT PAGE
+            </span>
+            {selectedPage !== 'all' && (
+              <button
+                type="button"
+                onClick={() => setSelectedPage('all')}
+                className="text-xs text-indigo-600 font-bold hover:underline"
+              >
+                View All Pages
+              </button>
+            )}
+          </div>
+          
+          <div className="flex flex-wrap gap-2">
+            {pagesList.map(page => {
+              const allPageItems = [
+                ...(page.dax_results || []),
+                ...(page.page_level_results || []),
+                ...(page.visual_results || [])
+              ];
+              const failed = allPageItems.filter(r => r.status === 'fail').length;
+              const warnings = allPageItems.filter(r => r.status === 'warning').length;
+              const isSelected = selectedPage === page.page_name;
+
+              return (
+                <button
+                  key={page.page_name}
+                  type="button"
+                  onClick={() => setSelectedPage(page.page_name)}
+                  className={`px-3.5 py-2 rounded-lg text-xs font-semibold shadow-sm transition-all flex items-center gap-2 ${
+                    isSelected
+                      ? 'bg-indigo-600 text-white font-bold ring-2 ring-indigo-300'
+                      : 'bg-white border border-slate-200 text-slate-700 hover:border-indigo-400 hover:text-indigo-600'
+                  }`}
+                >
+                  <span>{page.page_name}</span>
+                  <span className="flex items-center gap-1">
+                    {failed > 0 && <span className={`h-2 w-2 rounded-full ${isSelected ? 'bg-rose-300' : 'bg-rose-500'}`}></span>}
+                    {warnings > 0 && <span className={`h-2 w-2 rounded-full ${isSelected ? 'bg-amber-300' : 'bg-amber-500'}`}></span>}
+                    {failed === 0 && warnings === 0 && <span className={`h-2 w-2 rounded-full ${isSelected ? 'bg-emerald-300' : 'bg-emerald-500'}`}></span>}
+                  </span>
+                  <span className={`text-[10px] px-1.5 py-0.2 rounded font-mono ${
+                    isSelected ? 'bg-indigo-700/60 text-white' : 'bg-slate-100 text-slate-500'
+                  }`}>
+                    {allPageItems.length}
+                  </span>
+                </button>
+              );
+            })}
+
+            {notUsedOnAnyPage.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setSelectedPage('not_used')}
+                className={`px-3.5 py-2 rounded-lg text-xs font-semibold shadow-sm transition-all flex items-center gap-2 ${
+                  selectedPage === 'not_used'
+                    ? 'bg-indigo-600 text-white font-bold ring-2 ring-indigo-300'
+                    : 'bg-white border border-slate-200 text-slate-700 hover:border-indigo-400 hover:text-indigo-600'
+                }`}
+              >
+                <span>Not Used On Any Page</span>
+                <span className={`text-[10px] px-1.5 py-0.2 rounded font-mono ${
+                  selectedPage === 'not_used' ? 'bg-indigo-700/60 text-white' : 'bg-slate-100 text-slate-500'
+                }`}>
+                  {notUsedOnAnyPage.length}
+                </span>
+              </button>
+            )}
+
+            {reportLevelChecks.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setSelectedPage('report_level')}
+                className={`px-3.5 py-2 rounded-lg text-xs font-semibold shadow-sm transition-all flex items-center gap-2 ${
+                  selectedPage === 'report_level'
+                    ? 'bg-indigo-600 text-white font-bold ring-2 ring-indigo-300'
+                    : 'bg-white border border-slate-200 text-slate-700 hover:border-indigo-400 hover:text-indigo-600'
+                }`}
+              >
+                <span>Report-Level Checks</span>
+                <span className={`text-[10px] px-1.5 py-0.2 rounded font-mono ${
+                  selectedPage === 'report_level' ? 'bg-indigo-700/60 text-white' : 'bg-slate-100 text-slate-500'
+                }`}>
+                  {reportLevelChecks.length}
+                </span>
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={() => setSelectedPage('all')}
+              className={`px-3.5 py-2 rounded-lg text-xs font-semibold shadow-sm transition-all flex items-center gap-1.5 ${
+                selectedPage === 'all'
+                  ? 'bg-slate-900 text-white font-bold'
+                  : 'bg-white border border-slate-200 text-slate-700 hover:border-slate-400'
+              }`}
+            >
+              All Pages
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* STEP 2: CATEGORY FILTER BAR (Categories for Selected Page)                */}
+      {/* ========================================================================= */}
       <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 shadow-sm space-y-3">
         <div className="flex items-center justify-between">
           <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
             <span>🎯</span> QUICK NAVIGATION SHORTCUTS (CATEGORIES)
+            {selectedPage !== 'all' && (
+              <span className="text-indigo-600 font-bold ml-1">
+                — {selectedPage === 'not_used' ? 'Not Used On Any Page' : selectedPage === 'report_level' ? 'Report-Level Checks' : selectedPage}
+              </span>
+            )}
           </span>
           {categoryFilter !== 'all' && (
             <button
@@ -463,7 +604,7 @@ export default function ReportView() {
               className="text-xs text-indigo-600 font-bold hover:underline flex items-center gap-1"
             >
               <X className="h-3.5 w-3.5" />
-              Reset Filter (Showing All)
+              Reset Filter (Showing All Categories)
             </button>
           )}
         </div>
@@ -484,9 +625,10 @@ export default function ReportView() {
 
           {/* 12 Individual Category Filter Buttons */}
           {allCategoriesList.map(cat => {
-            const stats = getCategoryStats(cat.key);
+            const stats = getPageCategoryStats(cat.key);
             const isSelected = categoryFilter === cat.key || 
               (cat.key === 'dax_calculated_columns' && categoryFilter === 'dax_calculated_column_naming');
+            const hasItems = stats.count > 0;
 
             return (
               <button
@@ -501,21 +643,30 @@ export default function ReportView() {
                 className={`px-3 py-1.5 rounded-lg text-xs font-semibold shadow-sm transition-all flex items-center gap-1.5 ${
                   isSelected
                     ? 'bg-indigo-600 text-white font-bold ring-2 ring-indigo-300'
-                    : 'bg-white border border-slate-200 hover:border-indigo-500 hover:text-indigo-600 text-slate-700'
+                    : hasItems
+                      ? 'bg-white border border-slate-200 hover:border-indigo-500 hover:text-indigo-600 text-slate-700'
+                      : 'bg-slate-100/70 border border-slate-200/60 text-slate-400 opacity-60'
                 }`}
               >
                 <span>{cat.name}</span>
-                <span className="flex items-center gap-1">
-                  {stats.failed > 0 && (
-                    <span className={`h-2 w-2 rounded-full ${isSelected ? 'bg-rose-300' : 'bg-rose-500'}`}></span>
-                  )}
-                  {stats.warnings > 0 && (
-                    <span className={`h-2 w-2 rounded-full ${isSelected ? 'bg-amber-300' : 'bg-amber-500'}`}></span>
-                  )}
-                  {stats.failed === 0 && stats.warnings === 0 && (
-                    <span className={`h-2 w-2 rounded-full ${isSelected ? 'bg-emerald-300' : 'bg-emerald-500'}`}></span>
-                  )}
-                </span>
+                {hasItems ? (
+                  <span className="flex items-center gap-1">
+                    {stats.failed > 0 && (
+                      <span className={`h-2 w-2 rounded-full ${isSelected ? 'bg-rose-300' : 'bg-rose-500'}`}></span>
+                    )}
+                    {stats.warnings > 0 && (
+                      <span className={`h-2 w-2 rounded-full ${isSelected ? 'bg-amber-300' : 'bg-amber-500'}`}></span>
+                    )}
+                    {stats.failed === 0 && stats.warnings === 0 && (
+                      <span className={`h-2 w-2 rounded-full ${isSelected ? 'bg-emerald-300' : 'bg-emerald-500'}`}></span>
+                    )}
+                    <span className={`text-[10px] ml-0.5 font-mono ${isSelected ? 'text-indigo-100' : 'text-slate-500'}`}>
+                      ({stats.count})
+                    </span>
+                  </span>
+                ) : (
+                  <span className="text-[10px] text-slate-400 font-mono">(0)</span>
+                )}
               </button>
             );
           })}
@@ -596,6 +747,9 @@ export default function ReportView() {
           <div className="space-y-6">
             {/* Real Report Pages */}
             {pagesList.map(page => {
+              // Only display this page if selectedPage is 'all' or matches this page
+              if (selectedPage !== 'all' && selectedPage !== page.page_name) return null;
+
               const filteredDax = (page.dax_results || []).filter(r => matchesCategory(r.category) && matchesStatus(r.status));
               const filteredPageLevel = (page.page_level_results || []).filter(r => matchesCategory(r.category) && matchesStatus(r.status));
               const filteredVisuals = (page.visual_results || []).filter(r => matchesCategory(r.category) && matchesStatus(r.status));
@@ -793,7 +947,7 @@ export default function ReportView() {
             })}
 
             {/* Special Bucket 1: Not Used On Any Page */}
-            {notUsedOnAnyPage.length > 0 && (() => {
+            {(selectedPage === 'all' || selectedPage === 'not_used') && notUsedOnAnyPage.length > 0 && (() => {
               const filteredNotUsed = notUsedOnAnyPage.filter(r => matchesCategory(r.category) && matchesStatus(r.status));
               if (filteredNotUsed.length === 0 && (statusFilter !== 'all' || categoryFilter !== 'all')) return null;
 
@@ -883,7 +1037,7 @@ export default function ReportView() {
             })()}
 
             {/* Special Bucket 2: Report-Level Checks */}
-            {reportLevelChecks.length > 0 && (() => {
+            {(selectedPage === 'all' || selectedPage === 'report_level') && reportLevelChecks.length > 0 && (() => {
               const filteredReportLevel = reportLevelChecks.filter(r => matchesCategory(r.category) && matchesStatus(r.status));
               if (filteredReportLevel.length === 0 && (statusFilter !== 'all' || categoryFilter !== 'all')) return null;
 

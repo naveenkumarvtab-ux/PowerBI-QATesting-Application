@@ -5,7 +5,7 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer 
 } from 'recharts';
 import { 
-  Download, ArrowLeft, CheckCircle2, AlertTriangle, XCircle, ChevronDown, ChevronUp, AlertCircle, Loader2, Info, Layers, FileCode, CheckSquare, X
+  Download, ArrowLeft, CheckCircle2, AlertTriangle, XCircle, ChevronDown, ChevronUp, AlertCircle, Loader2, Info, Layers, FileCode, CheckSquare, X, ExternalLink
 } from 'lucide-react';
 
 export default function ReportView() {
@@ -236,16 +236,36 @@ export default function ReportView() {
       {/* Title block */}
       <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 mb-1 flex-wrap">
               <span className="px-2.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-indigo-50 text-indigo-700 border border-indigo-200">
                 {method === 'pbix_upload' ? 'PBIX Static & Functional' : 'Power BI Service'}
               </span>
-              <h1 className="text-xl font-bold text-slate-900 truncate">
-                {source || "Analysis Report"}
+              <h1 className="text-lg sm:text-xl font-bold text-slate-900 truncate">
+                {report.report_name && !report.report_name.startsWith('http') 
+                  ? report.report_name 
+                  : (method === 'pbix_upload' 
+                      ? (source || 'PBIX Analysis Report') 
+                      : 'Power BI Service Live Report')}
               </h1>
             </div>
-            <p className="text-xs text-slate-500 mt-1 font-mono">Job ID: {jobId}</p>
+
+            {source && source.startsWith('http') && (
+              <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                <span className="text-[11px] text-slate-400 font-medium shrink-0">Service URL:</span>
+                <a
+                  href={source}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-indigo-600 hover:text-indigo-800 hover:underline font-mono truncate max-w-xl inline-flex items-center gap-1.5 bg-slate-50 px-2 py-0.5 rounded border border-slate-200"
+                  title={source}
+                >
+                  <span className="truncate">{source}</span>
+                  <ExternalLink className="h-3 w-3 shrink-0" />
+                </a>
+              </div>
+            )}
+            <p className="text-xs text-slate-400 mt-1 font-mono">Job ID: {jobId}</p>
           </div>
           
           <div className="text-right text-xs text-slate-500 space-y-0.5">

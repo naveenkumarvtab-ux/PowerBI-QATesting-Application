@@ -12,7 +12,10 @@ class ExportTester:
     def _log(self, step_name, progress):
         if self.update_progress_callback:
             self.update_progress_callback(step_name, progress)
-        print(f"[Job {self.job_id}] ExportTest: {step_name} ({progress}%)")
+        try:
+            print(f"[Job {self.job_id}] ExportTest: {step_name} ({progress}%)")
+        except Exception:
+            pass
 
     def run_pdf_export_test(self, api_client, workspace_id, report_id):
         """

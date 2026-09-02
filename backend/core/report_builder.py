@@ -134,18 +134,19 @@ class ReportBuilder:
                 "screenshot_note": v.get("screenshot_note")
             })
             
-        # Add placeholders for any missing check categories in the manifest
-        for cat in manifest:
-            if len(sections_dict[cat]["results"]) == 0:
-                total += 1
-                errors += 1
-                sections_dict[cat]["results"].append({
-                    "target": f"{cat} — Check did not run",
-                    "status": "error",
-                    "message": "This check did not produce any results. It may not be implemented, may have failed silently, or was skipped for this job configuration.",
-                    "suggested_fix": "",
-                    "screenshot_url": None
-                })
+        # Add placeholders for missing check categories only for pbix upload method
+        if method not in ("service", "cloud"):
+            for cat in manifest:
+                if len(sections_dict[cat]["results"]) == 0:
+                    total += 1
+                    errors += 1
+                    sections_dict[cat]["results"].append({
+                        "target": f"{cat} — Check did not run",
+                        "status": "error",
+                        "message": "This check did not produce any results. It may not be implemented, may have failed silently, or was skipped for this job configuration.",
+                        "suggested_fix": "",
+                        "screenshot_url": None
+                    })
             
         # Add tables field to power_query_naming
         if "power_query_naming" in sections_dict:
@@ -196,16 +197,17 @@ class ReportBuilder:
                 pass
 
         # Standalone sections (Power Query and Data Model)
-        standalone_sections = []
-        if "power_query_naming" in sections_dict:
-            standalone_sections.append(sections_dict["power_query_naming"])
-        if "data_model" in sections_dict:
-            standalone_sections.append(sections_dict["data_model"])
+        standalone_sections = [
+            s for s in sections_dict.values()
+            if s["category"] in ("power_query_naming", "data_model")
+            and (method not in ("service", "cloud") or len(s["results"]) > 0)
+        ]
 
         # Category view sections (excluding standalone sections)
         category_sections = [
             s for s in sections_dict.values()
             if s["category"] not in ("power_query_naming", "data_model")
+            and (method not in ("service", "cloud") or len(s["results"]) > 0)
         ]
 
         # Extract field-to-page mappings from layout visual containers

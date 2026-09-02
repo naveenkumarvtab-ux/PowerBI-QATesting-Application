@@ -305,3 +305,24 @@ class PowerBIAPIClient:
         }
         res = self._post(f"groups/{workspace_id}/reports/{report_id}/GenerateToken", payload)
         return res.get("token")
+
+    def download_report_pbix(self, workspace_id, report_id):
+        """
+        Downloads report PBIX binary from Power BI Service to enable full layout analysis.
+        Endpoint: GET https://api.powerbi.com/v1.0/myorg/groups/{workspace_id}/reports/{report_id}/Export
+        """
+        if self.is_mock:
+            return None
+        url = f"{self.base_url}/groups/{workspace_id}/reports/{report_id}/Export"
+        res = requests.get(url, headers=self.headers, stream=True)
+        if res.status_code == 200:
+            os.makedirs(Config.UPLOAD_FOLDER, exist_ok=True)
+            target_path = os.path.join(Config.UPLOAD_FOLDER, f"service_{report_id}.pbix")
+            with open(target_path, "wb") as f:
+                for chunk in res.iter_content(chunk_size=65536):
+                    f.write(chunk)
+            return target_path
+        else:
+            print(f"PBIX export returned HTTP {res.status_code}")
+            return None
+

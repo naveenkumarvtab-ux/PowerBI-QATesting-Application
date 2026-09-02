@@ -143,7 +143,10 @@ class PlaywrightFunctionalTester:
     def _log(self, step_name, progress):
         if self.update_progress_callback:
             self.update_progress_callback(step_name, progress)
-        print(f"[Job {self.job_id}] Playwright: {step_name} ({progress}%)")
+        try:
+            print(f"[Job {self.job_id}] Playwright: {step_name} ({progress}%)")
+        except Exception:
+            pass
 
     def run_tests(self):
         """

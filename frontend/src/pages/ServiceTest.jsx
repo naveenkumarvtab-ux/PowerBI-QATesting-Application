@@ -33,20 +33,30 @@ export default function ServiceTest() {
   // Handle OAuth Redirect callback on mount
   useEffect(() => {
     const handleCallback = async () => {
-      const urlParts = window.location.href.split('?');
-      if (urlParts.length > 1) {
-        const searchParams = new URLSearchParams(urlParts[1]);
+      // Check query parameters in window.location.search or hash
+      const searchString = window.location.search || (window.location.href.includes('?') ? '?' + window.location.href.split('?')[1] : '');
+      if (searchString) {
+        const searchParams = new URLSearchParams(searchString.startsWith('?') ? searchString.slice(1) : searchString);
         const code = searchParams.get('code');
+        const state = searchParams.get('state');
+        const errDesc = searchParams.get('error_description') || searchParams.get('error');
+
+        // Immediately clean search params from address bar
+        window.history.replaceState({}, document.title, window.location.pathname + (window.location.hash.split('?')[0] || '#/test-service'));
+
+        if (errDesc) {
+          setError(decodeURIComponent(errDesc.replace(/\+/g, ' ')));
+          return;
+        }
+
         if (code) {
-          // Clean search params from URL immediately
-          window.history.replaceState({}, document.title, window.location.pathname + window.location.hash.split('?')[0]);
-          
           setConnecting(true);
           setError(null);
           try {
-            const redirectUri = customRedirectUri || window.location.origin;
+            const redirectUri = customRedirectUri || localStorage.getItem('pbi_custom_redirect_uri') || window.location.origin;
             const response = await axios.post('/api/service/oauth/callback', {
               code,
+              state,
               redirect_uri: redirectUri,
               client_id: customClientId || localStorage.getItem('pbi_custom_client_id') || undefined,
               tenant_id: customTenantId || localStorage.getItem('pbi_custom_tenant_id') || undefined

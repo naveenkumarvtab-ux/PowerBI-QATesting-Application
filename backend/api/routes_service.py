@@ -373,6 +373,7 @@ def oauth_callback():
     try:
         data = request.get_json() or {}
         code = data.get("code")
+        state = data.get("state")
         redirect_uri = data.get("redirect_uri")
         client_id = data.get("client_id")
         client_secret = data.get("client_secret")
@@ -383,6 +384,7 @@ def oauth_callback():
             
         token_info = auth_service.acquire_token_by_auth_code(
             code, redirect_uri,
+            state=state,
             client_id=client_id,
             client_secret=client_secret,
             tenant_id=tenant_id

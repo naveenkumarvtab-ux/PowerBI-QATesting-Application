@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { HashRouter as Router, Routes, Route } from 'react-router-dom';
 import Navbar from './components/Navbar';
 import Home from './pages/Home';
@@ -9,6 +9,13 @@ import ReportView from './pages/ReportView';
 import History from './pages/History';
 
 export default function App() {
+  useEffect(() => {
+    // Intercept OAuth code or error landing on root URL and redirect into #/test-service
+    const search = window.location.search;
+    if (search && (search.includes('code=') || search.includes('error='))) {
+      window.location.replace(window.location.origin + '/#/test-service' + search);
+    }
+  }, []);
   return (
     <Router>
       <div className="min-h-screen bg-slate-50 flex flex-col font-sans">

@@ -201,17 +201,65 @@ export default function ServiceTest() {
             </div>
           ) : (
             /* Unauthenticated State */
-            <div className="space-y-3">
+            <div className="space-y-4">
+              {/* Azure App Credentials Inputs */}
+              <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3 text-xs">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-slate-800 flex items-center gap-1.5">
+                    <Settings className="h-3.5 w-3.5 text-indigo-600" />
+                    Azure App Registration Credentials
+                  </span>
+                  <span className="text-[10px] text-slate-500 font-medium">From Azure Portal Overview</span>
+                </div>
+
+                <div className="space-y-2.5">
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">
+                      Application (Client) ID <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. 951bc46a-5352-45aa-a327-b84d9bdc3f20"
+                      value={customClientId}
+                      onChange={(e) => {
+                        setCustomClientId(e.target.value);
+                        localStorage.setItem('pbi_custom_client_id', e.target.value);
+                      }}
+                      className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg font-mono text-xs focus:outline-none focus:border-indigo-500 shadow-sm"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">
+                      Directory (Tenant) ID <span className="text-indigo-600 font-normal">(Required for Single-Tenant Apps)</span>
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                      value={customTenantId}
+                      onChange={(e) => {
+                        setCustomTenantId(e.target.value);
+                        localStorage.setItem('pbi_custom_tenant_id', e.target.value);
+                      }}
+                      className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg font-mono text-xs focus:outline-none focus:border-indigo-500 shadow-sm"
+                    />
+                    <p className="text-[10px] text-slate-500 mt-1">
+                      💡 Found in <strong>Azure Portal $\rightarrow$ Microsoft Entra ID $\rightarrow$ Overview</strong>.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
               <button
                 type="button"
                 onClick={handleMicrosoftSignIn}
-                disabled={connecting}
+                disabled={connecting || !customClientId.trim()}
                 className="w-full py-3 bg-slate-900 hover:bg-slate-800 text-white text-sm font-semibold rounded-xl shadow-sm flex items-center justify-center gap-2.5 transition-colors disabled:opacity-50"
               >
                 {connecting ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin text-indigo-400" />
-                    Opening Microsoft Sign-In...
+                    Connecting to Microsoft Sign-In...
                   </>
                 ) : (
                   <>
@@ -225,46 +273,6 @@ export default function ServiceTest() {
                   </>
                 )}
               </button>
-
-              {/* Azure App Registration Configuration (Optional dropdown) */}
-              <div className="pt-1">
-                <button
-                  type="button"
-                  onClick={() => setShowAzureConfig(!showAzureConfig)}
-                  className="text-xs text-indigo-600 hover:underline flex items-center gap-1 font-medium"
-                >
-                  <Settings className="h-3.5 w-3.5" />
-                  {showAzureConfig ? "Hide Azure App Configuration" : "Custom Azure App Registration (Optional)"}
-                </button>
-
-                {showAzureConfig && (
-                  <div className="mt-2.5 p-3.5 bg-slate-50 border border-slate-200 rounded-lg space-y-2.5 text-xs">
-                    <p className="text-slate-500 leading-relaxed">
-                      If your organization uses a specific Azure AD App Registration, specify your Client ID below:
-                    </p>
-                    <div>
-                      <label className="block font-semibold text-slate-700 mb-1">Azure Client ID (Application ID)</label>
-                      <input
-                        type="text"
-                        placeholder="e.g. 11111111-2222-3333-4444-555555555555"
-                        value={customClientId}
-                        onChange={(e) => setCustomClientId(e.target.value)}
-                        className="w-full px-2.5 py-1.5 border border-slate-300 rounded font-mono text-xs focus:outline-none focus:border-indigo-500"
-                      />
-                    </div>
-                    <div>
-                      <label className="block font-semibold text-slate-700 mb-1">Azure Tenant ID (Optional, default: 'common')</label>
-                      <input
-                        type="text"
-                        placeholder="e.g. your-tenant-id or common"
-                        value={customTenantId}
-                        onChange={(e) => setCustomTenantId(e.target.value)}
-                        className="w-full px-2.5 py-1.5 border border-slate-300 rounded font-mono text-xs focus:outline-none focus:border-indigo-500"
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
             </div>
           )}
         </div>

@@ -10,10 +10,10 @@ export default function ServiceTest() {
   const [username, setUsername] = useState(null);
   const [token, setToken] = useState(null);
   
-  // Custom Azure App credentials (optional in UI)
-  const [showAzureConfig, setShowAzureConfig] = useState(false);
-  const [customClientId, setCustomClientId] = useState(localStorage.getItem('pbi_custom_client_id') || '');
-  const [customTenantId, setCustomTenantId] = useState(localStorage.getItem('pbi_custom_tenant_id') || '');
+  // Custom Azure App credentials
+  const [customClientId, setCustomClientId] = useState(localStorage.getItem('pbi_custom_client_id') || '951bc46a-5352-45aa-a327-b84d9bdc3f20');
+  const [customTenantId, setCustomTenantId] = useState(localStorage.getItem('pbi_custom_tenant_id') || 'd96cb34e-74be-402e-83f8-b2d504c4bcfa');
+  const [customRedirectUri, setCustomRedirectUri] = useState(localStorage.getItem('pbi_custom_redirect_uri') || window.location.origin);
   
   const [checks, setChecks] = useState({
     naming: true,
@@ -44,7 +44,7 @@ export default function ServiceTest() {
           setConnecting(true);
           setError(null);
           try {
-            const redirectUri = window.location.origin;
+            const redirectUri = customRedirectUri || window.location.origin;
             const response = await axios.post('/api/service/oauth/callback', {
               code,
               redirect_uri: redirectUri,
@@ -68,7 +68,7 @@ export default function ServiceTest() {
     };
     
     handleCallback();
-  }, [location]);
+  }, [location, customRedirectUri]);
 
   const handleMicrosoftSignIn = async () => {
     setConnecting(true);
@@ -76,7 +76,7 @@ export default function ServiceTest() {
     setSuccessMsg(null);
     
     try {
-      const redirectUri = window.location.origin;
+      const redirectUri = customRedirectUri || window.location.origin;
       const response = await axios.post('/api/service/connect', {
         auth_mode: 'delegated',
         redirect_uri: redirectUri,
@@ -88,6 +88,7 @@ export default function ServiceTest() {
         // Save custom settings before redirect
         if (customClientId) localStorage.setItem('pbi_custom_client_id', customClientId);
         if (customTenantId) localStorage.setItem('pbi_custom_tenant_id', customTenantId);
+        if (customRedirectUri) localStorage.setItem('pbi_custom_redirect_uri', customRedirectUri);
         // Redirect user to Microsoft Azure AD login page
         window.location.href = response.data.auth_url;
       }
@@ -248,13 +249,54 @@ export default function ServiceTest() {
                     </p>
                   </div>
 
-                  <div className="pt-2 border-t border-slate-200">
-                    <p className="text-[11px] text-slate-600">
-                      🔗 <strong>Required Redirect URI in Azure Portal:</strong>
-                    </p>
-                    <div className="mt-1 px-2.5 py-1.5 bg-white border border-slate-200 rounded font-mono text-[11px] text-indigo-700 flex items-center justify-between">
-                      <span>{window.location.origin}</span>
-                      <span className="text-[10px] text-slate-400 font-sans">(Platform: Web or SPA)</span>
+                  <div className="pt-2 border-t border-slate-200 space-y-1.5">
+                    <label className="block font-semibold text-slate-700">
+                      Redirect URI <span className="text-slate-400 font-normal">(Must match Azure Portal exactly)</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={customRedirectUri}
+                      onChange={(e) => {
+                        setCustomRedirectUri(e.target.value);
+                        localStorage.setItem('pbi_custom_redirect_uri', e.target.value);
+                      }}
+                      className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg font-mono text-xs focus:outline-none focus:border-indigo-500 shadow-sm"
+                    />
+                    <div className="flex flex-wrap gap-1.5 pt-1">
+                      <span className="text-[10px] text-slate-400 self-center">Presets:</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const val = window.location.origin;
+                          setCustomRedirectUri(val);
+                          localStorage.setItem('pbi_custom_redirect_uri', val);
+                        }}
+                        className="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded text-[10px] font-mono text-slate-700"
+                      >
+                        {window.location.origin}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const val = window.location.origin + "/";
+                          setCustomRedirectUri(val);
+                          localStorage.setItem('pbi_custom_redirect_uri', val);
+                        }}
+                        className="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded text-[10px] font-mono text-slate-700"
+                      >
+                        {window.location.origin}/
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const val = window.location.origin + "/#/test-service";
+                          setCustomRedirectUri(val);
+                          localStorage.setItem('pbi_custom_redirect_uri', val);
+                        }}
+                        className="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded text-[10px] font-mono text-slate-700"
+                      >
+                        {window.location.origin}/#/test-service
+                      </button>
                     </div>
                   </div>
                 </div>

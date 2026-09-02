@@ -30,11 +30,12 @@ class PowerBIAuthService:
             error_desc = result.get("error_description", "Unknown error acquiring token")
             raise Exception(f"Failed to acquire Service Principal token: {error_desc}")
 
-    def get_auth_url(self, redirect_uri, state=None, client_id=None, tenant_id=None):
+    def get_auth_url(self, redirect_uri, state=None, client_id=None, tenant_id=None, client_secret=None):
         """
         Generate authorization URL for Delegated User OAuth Flow (Auth Code Flow).
         """
         effective_client_id = client_id or Config.CLIENT_ID
+        effective_client_secret = client_secret or Config.CLIENT_SECRET
         effective_tenant_id = tenant_id or Config.TENANT_ID or "common"
         effective_authority = f"https://login.microsoftonline.com/{effective_tenant_id}"
 
@@ -44,11 +45,17 @@ class PowerBIAuthService:
                 "Please provide a Client ID or configure it in the backend settings."
             )
 
-        app = msal.ConfidentialClientApplication(
-            effective_client_id,
-            authority=effective_authority,
-            client_credential=Config.CLIENT_SECRET or "dummy_secret"
-        )
+        if effective_client_secret:
+            app = msal.ConfidentialClientApplication(
+                effective_client_id,
+                authority=effective_authority,
+                client_credential=effective_client_secret
+            )
+        else:
+            app = msal.PublicClientApplication(
+                effective_client_id,
+                authority=effective_authority
+            )
         
         # Power BI scopes for user access
         scopes = [
@@ -83,23 +90,33 @@ class PowerBIAuthService:
         if not effective_client_id:
             raise ValueError("Azure AD CLIENT_ID is missing.")
 
-        app = msal.ConfidentialClientApplication(
-            effective_client_id,
-            authority=effective_authority,
-            client_credential=effective_client_secret
-        )
-        
         scopes = [
             "https://analysis.windows.net/powerbi/api/Report.Read.All",
             "https://analysis.windows.net/powerbi/api/Dataset.Read.All",
             "https://analysis.windows.net/powerbi/api/Workspace.Read.All"
         ]
-        
-        result = app.acquire_token_by_authorization_code(
-            code,
-            scopes=scopes,
-            redirect_uri=redirect_uri
-        )
+
+        if effective_client_secret:
+            app = msal.ConfidentialClientApplication(
+                effective_client_id,
+                authority=effective_authority,
+                client_credential=effective_client_secret
+            )
+            result = app.acquire_token_by_authorization_code(
+                code,
+                scopes=scopes,
+                redirect_uri=redirect_uri
+            )
+        else:
+            app = msal.PublicClientApplication(
+                effective_client_id,
+                authority=effective_authority
+            )
+            result = app.acquire_token_by_authorization_code(
+                code,
+                scopes=scopes,
+                redirect_uri=redirect_uri
+            )
         
         if "access_token" in result:
             return {

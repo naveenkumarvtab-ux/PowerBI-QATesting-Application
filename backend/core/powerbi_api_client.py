@@ -7,6 +7,7 @@ from backend.config import Config
 class PowerBIAPIClient:
     def __init__(self, token):
         self.token = token
+        self.is_mock = not token or str(token).startswith("MOCK_")
         self.headers = {
             "Authorization": f"Bearer {token}",
             "Content-Type": "application/json"
@@ -29,7 +30,7 @@ class PowerBIAPIClient:
         """
         Gets details of a specific report.
         """
-        if Config.MOCK_SERVICE:
+        if self.is_mock:
             return {
                 "id": report_id,
                 "name": "Mock Sales Analysis Report",
@@ -43,7 +44,7 @@ class PowerBIAPIClient:
         Query dataset schema using executeQueries DMV API.
         Extracts M query partition formulas, DAX measures, and DAX calculated columns.
         """
-        if Config.MOCK_SERVICE:
+        if self.is_mock:
             # Return realistic mock metadata for testing
             mock_m = {
                 "Src_SalesData": "let\n    Source = Sql.Database(\"localhost\", \"SalesDB\"),\n    Sales_Table = Source{[Schema=\"dbo\",Item=\"Sales\"]}[Data],\n    #\"Changed Type\" = Table.TransformColumnTypes(Sales_Table,{{\"Amount\", type number}})\nin\n    #\"Changed Type\"",
@@ -172,7 +173,7 @@ class PowerBIAPIClient:
         Calls Export To File REST API and polls until download completes.
         Saves PDF to output_path.
         """
-        if Config.MOCK_SERVICE:
+        if self.is_mock:
             # Simulate a 3 second delay and write a mock report pdf
             time.sleep(3)
             try:
@@ -224,7 +225,7 @@ class PowerBIAPIClient:
         """
         Uploads a PBIX file to a workspace.
         """
-        if Config.MOCK_SERVICE:
+        if self.is_mock:
             time.sleep(2)
             return {
                 "id": "mock-import-uuid-22222",
@@ -260,7 +261,7 @@ class PowerBIAPIClient:
             raise Exception("Import operation timed out.")
 
     def delete_report(self, workspace_id, report_id):
-        if Config.MOCK_SERVICE:
+        if self.is_mock:
             return True
         url = f"{self.base_url}/groups/{workspace_id}/reports/{report_id}"
         res = requests.delete(url, headers=self.headers)
@@ -268,7 +269,7 @@ class PowerBIAPIClient:
         return True
 
     def delete_dataset(self, workspace_id, dataset_id):
-        if Config.MOCK_SERVICE:
+        if self.is_mock:
             return True
         url = f"{self.base_url}/groups/{workspace_id}/datasets/{dataset_id}"
         res = requests.delete(url, headers=self.headers)
@@ -279,7 +280,7 @@ class PowerBIAPIClient:
         """
         Gets pages of a specific report.
         """
-        if Config.MOCK_SERVICE:
+        if self.is_mock:
             return {
                 "value": [
                     {"name": "ReportSection1", "displayName": "Sales Overview"},
@@ -297,7 +298,7 @@ class PowerBIAPIClient:
         """
         Generates an embed token for a specific report in a workspace.
         """
-        if Config.MOCK_SERVICE:
+        if self.is_mock:
             return "mock-embed-token-xyz-12345"
         payload = {
             "accessLevel": "View"

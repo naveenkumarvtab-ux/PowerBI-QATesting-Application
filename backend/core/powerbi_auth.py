@@ -13,9 +13,6 @@ class PowerBIAuthService:
         self.scopes = ["https://analysis.windows.net/powerbi/api/.default"]
 
     def get_service_principal_token(self):
-        """
-        Acquire AAD access token using client credentials flow (Service Principal).
-        """
         if Config.MOCK_SERVICE:
             return "MOCK_SP_ACCESS_TOKEN_12345"
 
@@ -39,12 +36,12 @@ class PowerBIAuthService:
 
     def get_auth_url(self, redirect_uri, state=None, client_id=None, tenant_id=None, client_secret=None):
         """
-        Generate authorization URL for Delegated User OAuth Flow (Auth Code Flow).
-        Works with Azure 'Web' platform type -- server-side code exchange.
-        IMPORTANT: In Azure Portal, register redirect_uri under 'Web' platform
-        (NOT 'Single-page application'). SPA codes can only be redeemed in-browser.
+        Generate authorization URL for Delegated User OAuth (Auth Code Flow).
+        Uses ConfidentialClientApplication because the Azure App is registered as a
+        Web platform (confidential client) requiring a client_secret.
         """
         effective_client_id = client_id or Config.CLIENT_ID
+        effective_client_secret = client_secret or Config.CLIENT_SECRET
         effective_tenant_id = tenant_id or Config.TENANT_ID or "common"
         effective_authority = f"https://login.microsoftonline.com/{effective_tenant_id}"
 
@@ -60,10 +57,17 @@ class PowerBIAuthService:
             "https://analysis.windows.net/powerbi/api/Workspace.Read.All",
         ]
 
-        app = msal.PublicClientApplication(
-            effective_client_id,
-            authority=effective_authority,
-        )
+        if effective_client_secret:
+            app = msal.ConfidentialClientApplication(
+                effective_client_id,
+                authority=effective_authority,
+                client_credential=effective_client_secret,
+            )
+        else:
+            app = msal.PublicClientApplication(
+                effective_client_id,
+                authority=effective_authority,
+            )
 
         auth_url = app.get_authorization_request_url(
             scopes,
@@ -74,9 +78,10 @@ class PowerBIAuthService:
 
     def acquire_token_by_auth_code(self, code, redirect_uri, state=None, client_id=None, client_secret=None, tenant_id=None):
         """
-        Exchange authorization code for access token (server-side, Web platform).
-        The redirect_uri MUST exactly match what was used in get_auth_url() and what
-        is registered in Azure Portal under the 'Web' platform (not SPA).
+        Exchange authorization code for access token.
+        Uses ConfidentialClientApplication with client_secret for Web platform apps.
+        The redirect_uri MUST exactly match what was used in get_auth_url() and
+        what is registered in Azure Portal under the Web platform.
         """
         if code == "mock_auth_code_12345":
             return {
@@ -86,6 +91,7 @@ class PowerBIAuthService:
             }
 
         effective_client_id = client_id or Config.CLIENT_ID
+        effective_client_secret = client_secret or Config.CLIENT_SECRET
         effective_tenant_id = tenant_id or Config.TENANT_ID or "common"
         effective_authority = f"https://login.microsoftonline.com/{effective_tenant_id}"
 
@@ -98,10 +104,17 @@ class PowerBIAuthService:
             "https://analysis.windows.net/powerbi/api/Workspace.Read.All",
         ]
 
-        app = msal.PublicClientApplication(
-            effective_client_id,
-            authority=effective_authority,
-        )
+        if effective_client_secret:
+            app = msal.ConfidentialClientApplication(
+                effective_client_id,
+                authority=effective_authority,
+                client_credential=effective_client_secret,
+            )
+        else:
+            app = msal.PublicClientApplication(
+                effective_client_id,
+                authority=effective_authority,
+            )
 
         result = app.acquire_token_by_authorization_code(
             code,

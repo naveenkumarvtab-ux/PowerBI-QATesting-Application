@@ -13,7 +13,7 @@ export default function ServiceTest() {
   // Custom Azure App credentials
   const [customClientId, setCustomClientId] = useState(localStorage.getItem('pbi_custom_client_id') || '951bc46a-5352-45aa-a327-b84d9bdc3f20');
   const [customTenantId, setCustomTenantId] = useState(localStorage.getItem('pbi_custom_tenant_id') || 'd96cb34e-74be-402e-83f8-b2d504c4bcfa');
-  const [customRedirectUri, setCustomRedirectUri] = useState(localStorage.getItem('pbi_custom_redirect_uri') || window.location.origin);
+  const [customRedirectUri, setCustomRedirectUri] = useState(localStorage.getItem('pbi_custom_redirect_uri') || (window.location.origin + '/#/test-service'));
   
   const [checks, setChecks] = useState({
     naming: true,
@@ -264,6 +264,18 @@ export default function ServiceTest() {
                     />
                     <div className="flex flex-wrap gap-1.5 pt-1">
                       <span className="text-[10px] text-slate-400 self-center">Presets:</span>
+                      {/* Recommended */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const val = window.location.origin + "/#/test-service";
+                          setCustomRedirectUri(val);
+                          localStorage.setItem('pbi_custom_redirect_uri', val);
+                        }}
+                        className="px-2 py-0.5 bg-indigo-50 hover:bg-indigo-100 border border-indigo-300 rounded text-[10px] font-mono text-indigo-700 font-bold"
+                      >
+                        ✓ {window.location.origin}/#/test-service
+                      </button>
                       <button
                         type="button"
                         onClick={() => {
@@ -285,17 +297,6 @@ export default function ServiceTest() {
                         className="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded text-[10px] font-mono text-slate-700"
                       >
                         {window.location.origin}/
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const val = window.location.origin + "/#/test-service";
-                          setCustomRedirectUri(val);
-                          localStorage.setItem('pbi_custom_redirect_uri', val);
-                        }}
-                        className="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded text-[10px] font-mono text-slate-700"
-                      >
-                        {window.location.origin}/#/test-service
                       </button>
                     </div>
                   </div>

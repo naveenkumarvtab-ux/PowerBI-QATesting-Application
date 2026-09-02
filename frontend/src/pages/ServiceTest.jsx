@@ -38,18 +38,18 @@ export default function ServiceTest() {
         const searchParams = new URLSearchParams(urlParts[1]);
         const code = searchParams.get('code');
         if (code) {
-          // Immediately strip ?code= from URL to avoid re-triggering on reload
+          // Clean search params from URL immediately
           window.history.replaceState({}, document.title, window.location.pathname + window.location.hash.split('?')[0]);
           
           setConnecting(true);
           setError(null);
           try {
-            const redirectUri = window.location.origin + "/#/test-service";
+            const redirectUri = window.location.origin;
             const response = await axios.post('/api/service/oauth/callback', {
               code,
               redirect_uri: redirectUri,
-              client_id: customClientId || undefined,
-              tenant_id: customTenantId || undefined
+              client_id: customClientId || localStorage.getItem('pbi_custom_client_id') || undefined,
+              tenant_id: customTenantId || localStorage.getItem('pbi_custom_tenant_id') || undefined
             });
             
             if (response.data.success) {
@@ -76,7 +76,7 @@ export default function ServiceTest() {
     setSuccessMsg(null);
     
     try {
-      const redirectUri = window.location.origin + "/#/test-service";
+      const redirectUri = window.location.origin;
       const response = await axios.post('/api/service/connect', {
         auth_mode: 'delegated',
         redirect_uri: redirectUri,
@@ -246,6 +246,16 @@ export default function ServiceTest() {
                     <p className="text-[10px] text-slate-500 mt-1">
                       💡 Found in <strong>Azure Portal $\rightarrow$ Microsoft Entra ID $\rightarrow$ Overview</strong>.
                     </p>
+                  </div>
+
+                  <div className="pt-2 border-t border-slate-200">
+                    <p className="text-[11px] text-slate-600">
+                      🔗 <strong>Required Redirect URI in Azure Portal:</strong>
+                    </p>
+                    <div className="mt-1 px-2.5 py-1.5 bg-white border border-slate-200 rounded font-mono text-[11px] text-indigo-700 flex items-center justify-between">
+                      <span>{window.location.origin}</span>
+                      <span className="text-[10px] text-slate-400 font-sans">(Platform: Web or SPA)</span>
+                    </div>
                   </div>
                 </div>
               </div>

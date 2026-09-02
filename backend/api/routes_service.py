@@ -75,49 +75,24 @@ def run_service_analysis_job(job_id, report_url, checks, auth_token, app_context
         if "naming" in checks:
             current_progress += 5
             job.progress = current_progress
-            job.current_step = "Pulling dataset DMV schema metadata..."
+            job.current_step = "Fetching report layout and metadata from Power BI Service..."
             session.commit()
             
             try:
-                # 1. Fetch dataset ID
-                report_meta = api_client.get_report(workspace_id, report_id)
-                dataset_id = report_meta.get("datasetId")
-                
-                # 2. Fetch DMV schema metadata
-                metadata = api_client.query_dataset_metadata(dataset_id)
-                
-                # 3. Analyze naming standards
-                dax_anal = DaxAnalyzer()
-                m_anal = MQueryAnalyzer()
-                
-                # Analyze Power Query Step Naming
-                for qname, m_code in metadata["m_queries"].items():
-                    res = m_anal.analyze_query(qname, m_code)
-                    for r in res:
-                        violations_to_insert.append(RuleViolation(
-                            job_id=job_id, category=r["category"], target=r["target"],
-                            status=r["status"], message=r["message"], suggested_fix=r["suggested_fix"]
-                        ))
-                
-                # Analyze Measures
-                for mname, mexpr in metadata["dax_measures"].items():
-                    res = dax_anal.analyze_dax(mname, mexpr, is_measure=True)
-                    for r in res:
-                        violations_to_insert.append(RuleViolation(
-                            job_id=job_id, category=r["category"], target=r["target"],
-                            status=r["status"], message=r["message"], suggested_fix=r["suggested_fix"]
-                        ))
-                        
-                # Analyze Columns
-                for cname, cexpr in metadata["dax_columns"].items():
-                    res = dax_anal.analyze_dax(cname, cexpr, is_measure=False)
-                    for r in res:
-                        violations_to_insert.append(RuleViolation(
-                            job_id=job_id, category=r["category"], target=r["target"],
-                            status=r["status"], message=r["message"], suggested_fix=r["suggested_fix"]
-                        ))
-                        
-                # Locate and parse PBIX layout to run visual-usage, font, and alignment checks
+                # 1. Fetch report details
+                report_meta = {}
+                dataset_id = None
+                try:
+                    report_meta = api_client.get_report(workspace_id, report_id)
+                    dataset_id = report_meta.get("datasetId")
+                    rep_name = report_meta.get("name")
+                    if rep_name:
+                        job.current_step = f"Analyzing Power BI Report: '{rep_name}'..."
+                        session.commit()
+                except Exception as re:
+                    print(f"Failed to fetch report metadata: {re}")
+
+                # 2. Download PBIX from Service for full deep analysis
                 pbix_file = None
                 if Config.MOCK_SERVICE:
                     uploads_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "storage", "uploads")
@@ -131,54 +106,91 @@ def run_service_analysis_job(job_id, report_url, checks, auth_token, app_context
                         pbix_file = api_client.download_report_pbix(workspace_id, report_id)
                     except Exception as de:
                         print(f"Failed to download report PBIX from service: {de}")
-                        
+
+                # 3. Parse PBIX file if available
+                parsed_meta = {}
                 layout_str = None
-                layout_violations = []
                 if pbix_file:
                     try:
                         parser = PBIXParser(pbix_file)
-                        # Sync measures/columns from DMV to layout parser to check visual usage
-                        parser.dax_measures = metadata["dax_measures"]
-                        parser.dax_columns = metadata["dax_columns"]
-                        parser.relationships_list = metadata.get("relationships", [])
-                        parser.tables_list = metadata.get("tables", [])
-                        
                         parsed_meta = parser.parse()
                         layout_str = parsed_meta.get("layout_str")
                         job.layout_str = layout_str
                         if parsed_meta.get("excluded_counts"):
                             job.excluded_counts_str = json.dumps(parsed_meta.get("excluded_counts"))
-                        layout_violations = parsed_meta.get("layout_violations", [])
-                        
-                        # Add layout violations (font consistency, visual alignment, unused measures, static actions)
-                        for r in layout_violations:
-                            violations_to_insert.append(RuleViolation(
-                                job_id=job_id, category=r["category"], target=r["target"],
-                                status=r["status"], message=r["message"], suggested_fix=r["suggested_fix"],
-                                page_name=r.get("page_name"), visual_id=r.get("visual_id"), visual_title=r.get("visual_title")
-                            ))
                     except Exception as pe:
-                        print(f"Failed to parse downloaded/mock PBIX layout: {pe}")
-                        
-                # Analyze dataset-level rules (unused and duplicate measures) if layout was not parsed
-                if not pbix_file:
-                    dataset_checks = dax_anal.analyze_dataset(
-                        metadata["dax_measures"], 
-                        metadata["dax_columns"], 
-                        layout_str=None
-                    )
-                    for r in dataset_checks:
+                        print(f"Failed to parse PBIX layout: {pe}")
+
+                # 4. Supplemental DMV schema query (if PBIX did not contain measures or failed)
+                dmv_meta = {}
+                if (not parsed_meta.get("dax_measures") or not parsed_meta.get("m_queries")) and dataset_id:
+                    try:
+                        dmv_meta = api_client.query_dataset_metadata(dataset_id)
+                    except Exception as dmve:
+                        print(f"DMV query fallback notice: {dmve}")
+
+                # 5. Combined metadata (PBIX extracted data takes priority)
+                m_queries = parsed_meta.get("m_queries") or dmv_meta.get("m_queries") or {}
+                dax_measures = parsed_meta.get("dax_measures") or dmv_meta.get("dax_measures") or {}
+                dax_columns = parsed_meta.get("dax_columns") or dmv_meta.get("dax_columns") or {}
+
+                dax_anal = DaxAnalyzer()
+                m_anal = MQueryAnalyzer()
+
+                # Analyze Power Query Step Naming
+                for qname, m_code in m_queries.items():
+                    res = m_anal.analyze_query(qname, m_code)
+                    for r in res:
                         violations_to_insert.append(RuleViolation(
                             job_id=job_id, category=r["category"], target=r["target"],
-                            status=r["status"], message=r["message"], suggested_fix=r["suggested_fix"],
-                            page_name=r.get("page_name"), visual_id=r.get("visual_id"), visual_title=r.get("visual_title")
+                            status=r["status"], message=r["message"], suggested_fix=r["suggested_fix"]
                         ))
+
+                # Analyze Measures (Naming + DAX Complexity & VAR check)
+                for mname, mexpr in dax_measures.items():
+                    res = dax_anal.analyze_dax(mname, mexpr, is_measure=True)
+                    for r in res:
+                        violations_to_insert.append(RuleViolation(
+                            job_id=job_id, category=r["category"], target=r["target"],
+                            status=r["status"], message=r["message"], suggested_fix=r["suggested_fix"]
+                        ))
+
+                # Analyze Columns
+                for cname, cexpr in dax_columns.items():
+                    res = dax_anal.analyze_dax(cname, cexpr, is_measure=False)
+                    for r in res:
+                        violations_to_insert.append(RuleViolation(
+                            job_id=job_id, category=r["category"], target=r["target"],
+                            status=r["status"], message=r["message"], suggested_fix=r["suggested_fix"]
+                        ))
+
+                # Add layout violations (Font Consistency, Visual Alignment, Static Actions)
+                for r in parsed_meta.get("layout_violations", []):
+                    violations_to_insert.append(RuleViolation(
+                        job_id=job_id, category=r["category"], target=r["target"],
+                        status=r["status"], message=r["message"], suggested_fix=r["suggested_fix"],
+                        page_name=r.get("page_name"), visual_id=r.get("visual_id"), visual_title=r.get("visual_title")
+                    ))
+
+                # Analyze dataset-level rules (Unused Measures, Unused Columns, Data Model Alignment)
+                dataset_checks = dax_anal.analyze_dataset(
+                    dax_measures,
+                    dax_columns,
+                    layout_str=layout_str
+                )
+                for r in dataset_checks:
+                    violations_to_insert.append(RuleViolation(
+                        job_id=job_id, category=r["category"], target=r["target"],
+                        status=r["status"], message=r["message"], suggested_fix=r["suggested_fix"],
+                        page_name=r.get("page_name"), visual_id=r.get("visual_id"), visual_title=r.get("visual_title")
+                    ))
+
             except Exception as e:
-                print(f"Service naming check failed: {e}")
+                print(f"Service naming check error: {e}")
                 violations_to_insert.append(RuleViolation(
                     job_id=job_id, category="power_query_naming", target="Dataset Metadata Retrieval",
-                    status="fail", message=f"Failed to query model schema DMV: {str(e)}",
-                    suggested_fix="Check that XMLA Read is enabled in settings and workspace is Premium."
+                    status="warning", message=f"Partial metadata analysis completed: {str(e)}",
+                    suggested_fix="Ensure report has accessible tables and visual containers."
                 ))
             
             current_progress += (progress_per_step - 5)

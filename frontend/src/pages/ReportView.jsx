@@ -129,14 +129,14 @@ export default function ReportView() {
   const categorySections = report.sections || [];
   const allSectionsForChart = [...standaloneSections, ...categorySections];
 
-  // Standard ordered category list
+  // Standard ordered category list matching local test breakdown
   const allCategoriesList = [
     { key: 'power_query_naming', name: 'Power Query Step Naming' },
+    { key: 'data_model', name: 'Data Model Alignment' },
     { key: 'dax_naming', name: 'DAX Measure Naming' },
     { key: 'dax_calculated_columns', name: 'DAX Calculated Column Naming' },
     { key: 'unused_measures', name: 'Unused Measures Check' },
     { key: 'unused_columns', name: 'Unused Columns Check' },
-    { key: 'data_model', name: 'Data Model Alignment' },
     { key: 'font_consistency', name: 'Font Consistency Check' },
     { key: 'visual_alignment', name: 'Visual Alignment Check' },
     { key: 'functional', name: 'Functional UI Testing' },
@@ -196,15 +196,16 @@ export default function ReportView() {
     return { count: matchedResults.length, failed, warnings, passed };
   };
 
-  // Prepare chart data
-  const chartData = allSectionsForChart.map(sec => {
-    const results = sec.results || [];
+  // Prepare chart data ensuring all 12 categories appear consistently on the axis
+  const chartData = allCategoriesList.map(cat => {
+    const sec = allSectionsForChart.find(s => s.category === cat.key || (cat.key === 'dax_calculated_columns' && s.category === 'dax_calculated_column_naming'));
+    const results = sec ? (sec.results || []) : [];
     const passed = results.filter(r => r.status === 'pass').length;
     const warnings = results.filter(r => r.status === 'warning').length;
     const failed = results.filter(r => r.status === 'fail').length;
     return {
-      name: sec.category_name || sec.title || sec.category,
-      categoryKey: sec.category,
+      name: cat.name,
+      categoryKey: cat.key,
       Passed: passed,
       Warnings: warnings,
       Failed: failed

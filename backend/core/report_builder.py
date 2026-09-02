@@ -31,18 +31,11 @@ class ReportBuilder:
         
         # Define expected manifest based on job method
         method = getattr(job, "method", "pbix").lower()
-        if method in ("service", "cloud"):
-            manifest = [
-                "power_query_naming", "dax_naming", "dax_calculated_columns", 
-                "unused_measures", "unused_columns", "data_model", "font_consistency", "visual_alignment", 
-                "functional", "export_pdf", "export_excel"
-            ]
-        else:
-            manifest = [
-                "power_query_naming", "dax_naming", "dax_calculated_columns", 
-                "unused_measures", "unused_columns", "data_model", "font_consistency", "visual_alignment", 
-                "functional"
-            ]
+        manifest = [
+            "power_query_naming", "dax_naming", "dax_calculated_columns", 
+            "unused_measures", "unused_columns", "data_model", "font_consistency", "visual_alignment", 
+            "functional", "dax_complexity", "export_pdf", "export_excel"
+        ]
             
         # Normalize violations list to dicts
         normalized_violations = [v.to_dict() if hasattr(v, "to_dict") else v for v in violations]

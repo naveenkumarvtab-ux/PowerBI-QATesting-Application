@@ -217,7 +217,9 @@ def run_service_analysis_job(job_id, report_url, checks, auth_token, app_context
                 
             tester = PlaywrightFunctionalTester(
                 job_id, report_url, update_playwright_progress, 
-                report_pages=report_pages,
+                report_pages=report_pages or (parsed_meta.get("pages") if parsed_meta else None),
+                page_bookmarks=parsed_meta.get("page_bookmarks") if parsed_meta else None,
+                page_slicers=parsed_meta.get("page_slicers") if parsed_meta else None,
                 workspace_id=workspace_id,
                 report_id=report_id,
                 api_client=api_client
@@ -230,7 +232,8 @@ def run_service_analysis_job(job_id, report_url, checks, auth_token, app_context
                         job_id=job_id, category=r["category"], target=r["target"],
                         status=r["status"], message=r["message"], suggested_fix=r["suggested_fix"],
                         screenshot_url=r.get("screenshot_url"),
-                        screenshot_note=r.get("screenshot_note")
+                        screenshot_note=r.get("screenshot_note"),
+                        page_name=r.get("page_name")
                     ))
             except Exception as e:
                 violations_to_insert.append(RuleViolation(

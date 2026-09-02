@@ -25,6 +25,9 @@ class ReportBuilder:
             "data_model": "Data Model Alignment",
             "visual_alignment": "Visual Alignment Check",
             "functional": "Functional UI Testing",
+            "performance": "Page Load & Render Performance",
+            "slicer_interactions": "Slicer & Visual Interaction Matrix",
+            "dataset_refresh": "Dataset Refresh Validation",
             "export_pdf": "PDF Export Verification",
             "export_excel": "Excel Export Verification"
         }
@@ -34,7 +37,8 @@ class ReportBuilder:
         manifest = [
             "power_query_naming", "dax_naming", "dax_calculated_columns", 
             "unused_measures", "unused_columns", "data_model", "font_consistency", "visual_alignment", 
-            "functional", "dax_complexity", "export_pdf", "export_excel"
+            "functional", "performance", "slicer_interactions", "dataset_refresh",
+            "dax_complexity", "export_pdf", "export_excel"
         ]
             
         # Normalize violations list to dicts

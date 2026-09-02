@@ -140,6 +140,9 @@ export default function ReportView() {
     { key: 'font_consistency', name: 'Font Consistency Check' },
     { key: 'visual_alignment', name: 'Visual Alignment Check' },
     { key: 'functional', name: 'Functional UI Testing' },
+    { key: 'performance', name: 'Page Load & Render Performance' },
+    { key: 'slicer_interactions', name: 'Slicer & Visual Interaction Matrix' },
+    { key: 'dataset_refresh', name: 'Dataset Refresh Validation' },
     { key: 'dax_complexity', name: 'DAX Complexity & VAR Check' },
     { key: 'pdf_export', name: 'PDF Export Verification' },
     { key: 'excel_export', name: 'Excel Export Verification' }

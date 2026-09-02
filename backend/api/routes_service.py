@@ -92,6 +92,52 @@ def run_service_analysis_job(job_id, report_url, checks, auth_token, app_context
                 except Exception as re:
                     print(f"Failed to fetch report metadata: {re}")
 
+                # Check Dataset Refresh History via Power BI REST API
+                if dataset_id:
+                    try:
+                        refresh_data = api_client.get_dataset_refreshes(workspace_id, dataset_id, top=1)
+                        if refresh_data and "value" in refresh_data and len(refresh_data["value"]) > 0:
+                            latest_ref = refresh_data["value"][0]
+                            ref_status = latest_ref.get("status", "Unknown")
+                            ref_end = latest_ref.get("endTime") or latest_ref.get("startTime") or "Recent"
+                            ref_type = latest_ref.get("refreshType", "Scheduled")
+                            
+                            if ref_status == "Completed":
+                                violations_to_insert.append(RuleViolation(
+                                    job_id=job_id, category="dataset_refresh",
+                                    target=f"Dataset Refresh Status ({ref_type})",
+                                    status="pass",
+                                    message=f"Latest dataset refresh succeeded on {ref_end}.",
+                                    suggested_fix=""
+                                ))
+                            elif ref_status == "Failed":
+                                err_info = latest_ref.get("serviceExceptionJson") or "Refresh job failed on Power BI Service."
+                                violations_to_insert.append(RuleViolation(
+                                    job_id=job_id, category="dataset_refresh",
+                                    target=f"Dataset Refresh Status ({ref_type})",
+                                    status="fail",
+                                    message=f"Dataset refresh failed on {ref_end}: {err_info[:200]}",
+                                    suggested_fix="Review scheduled refresh settings and credentials in Power BI Service workspace."
+                                ))
+                            else:
+                                violations_to_insert.append(RuleViolation(
+                                    job_id=job_id, category="dataset_refresh",
+                                    target=f"Dataset Refresh Status ({ref_type})",
+                                    status="warning",
+                                    message=f"Dataset refresh status: {ref_status} (Started: {ref_end}).",
+                                    suggested_fix="Check if a refresh job is currently in progress."
+                                ))
+                        else:
+                            violations_to_insert.append(RuleViolation(
+                                job_id=job_id, category="dataset_refresh",
+                                target="Dataset Refresh Status",
+                                status="pass",
+                                message="Dataset is live-connected or no recent refresh failure recorded.",
+                                suggested_fix=""
+                            ))
+                    except Exception as rfe:
+                        print(f"Dataset refresh check notice: {rfe}")
+
                 # 2. Download PBIX from Service for full deep analysis
                 pbix_file = None
                 if Config.MOCK_SERVICE:

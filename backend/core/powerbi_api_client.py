@@ -326,3 +326,26 @@ class PowerBIAPIClient:
             print(f"PBIX export returned HTTP {res.status_code}")
             return None
 
+    def get_dataset_refreshes(self, workspace_id, dataset_id, top=5):
+        """
+        Retrieves the refresh history for a dataset in a workspace.
+        Endpoint: GET https://api.powerbi.com/v1.0/myorg/groups/{workspace_id}/datasets/{dataset_id}/refreshes?$top={top}
+        """
+        if self.is_mock:
+            return {
+                "value": [
+                    {
+                        "id": 101,
+                        "refreshType": "ViaApi",
+                        "startTime": "2026-09-02T12:00:00Z",
+                        "endTime": "2026-09-02T12:03:45Z",
+                        "status": "Completed"
+                    }
+                ]
+            }
+        try:
+            return self._get(f"groups/{workspace_id}/datasets/{dataset_id}/refreshes?$top={top}")
+        except Exception as e:
+            print(f"Failed to fetch dataset refresh history: {e}")
+            return None
+

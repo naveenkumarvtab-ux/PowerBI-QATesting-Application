@@ -96,6 +96,25 @@ npm run dev
 
 Visit the app in your browser at `http://localhost:5173`. Any requests to `/api/*` will automatically be proxied to Flask on port 5000.
 
+### Supabase login and database
+
+The application uses Supabase Auth for email/password accounts and PostgreSQL for persistent job history. Configure these backend variables in `backend/.env`:
+
+```env
+SUPABASE_URL=https://your-project-ref.supabase.co
+SUPABASE_ANON_KEY=your-anon-key
+DATABASE_URL=postgresql://postgres.project-ref:password@session-pooler-host:5432/postgres
+```
+
+Configure these frontend variables in `frontend/.env`:
+
+```env
+VITE_SUPABASE_URL=https://your-project-ref.supabase.co
+VITE_SUPABASE_ANON_KEY=your-anon-key
+```
+
+Never expose the database password or a Supabase service-role key in frontend variables. In Supabase Authentication URL Configuration, add `http://localhost:5173/login` and `http://localhost:5173/reset-password` for local development, plus the equivalent production URLs. A custom SMTP provider such as Brevo is recommended for confirmation and password-recovery delivery.
+
 ---
 
 ## Azure AD (Entra ID) App Registration
@@ -103,7 +122,7 @@ Visit the app in your browser at `http://localhost:5173`. Any requests to `/api/
 To run live reports from the Power BI Service (Method 2) in production, you must set up an App Registration in your Azure Active Directory tenant:
 
 1. **Create App:** Navigate to Azure Portal &rarr; **App Registrations** &rarr; **New Registration**.
-2. **Redirect URI:** Set the Redirect URI type to *Single-page application (SPA)* or *Web* and add your OAuth callback address, for example: `http://localhost:5173/#/test-service`.
+2. **Redirect URI:** Set the Redirect URI type to *Single-page application (SPA)* or *Web* and add your OAuth callback address, for example: `http://localhost:5173/test-service`.
 3. **API Permissions:** Under **API Permissions**, select **Add a permission** &rarr; **Power BI Service**:
    * Add Delegated permissions: `Report.Read.All`, `Dataset.Read.All`, `Workspace.Read.All`.
    * Add Application permissions (if using Service Principal): `Tenant.Read.All`, `Report.Read.All`, `Dataset.Read.All`, `Workspace.Read.All`.
@@ -139,3 +158,5 @@ You can deploy the complete suite to Render using the preconfigured `render.yaml
    * **pbi-qa-backend:** Web service running the Docker container.
    * **pbi-qa-frontend:** Static site serving the React bundle.
 4. Set your Environment Variables (`CLIENT_ID`, `CLIENT_SECRET`, `TENANT_ID`) in the Render Dashboard to switch from mock checks to live validation.
+
+For authentication and persistent storage, also configure `DATABASE_URL`, `SUPABASE_URL`, and `SUPABASE_ANON_KEY` on the backend service, and `VITE_SUPABASE_URL` plus `VITE_SUPABASE_ANON_KEY` on the frontend static site. Frontend variables are embedded at build time, so redeploy the frontend after changing them.

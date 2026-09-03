@@ -29,7 +29,7 @@ def create_app():
     
     # Initialize SQLAlchemy database engine
     connect_args = {"check_same_thread": False} if "sqlite" in Config.DATABASE_URL else {}
-    engine = create_engine(Config.DATABASE_URL, connect_args=connect_args)
+    engine = create_engine(Config.DATABASE_URL, connect_args=connect_args, pool_pre_ping=True)
     
     # Scoped session factory for thread-safety across background jobs
     db_session_factory = sessionmaker(autocommit=False, autoflush=False, bind=engine)

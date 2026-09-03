@@ -1,9 +1,11 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { TestTube, History, FileSpreadsheet } from 'lucide-react';
+import { TestTube, History, LogOut, User } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function Navbar() {
   const location = useLocation();
+  const { user, signOut } = useAuth();
   
   const isActive = (path) => location.pathname === path;
 
@@ -45,8 +47,9 @@ export default function Navbar() {
             </div>
           </div>
           
-          <div className="flex items-center text-xs text-slate-400 bg-slate-800 px-3 py-1.5 rounded-full border border-slate-700 font-mono">
-            v1.0.0
+          <div className="flex items-center gap-3">
+            <div className="hidden sm:flex items-center gap-1.5 text-xs text-slate-300"><User className="h-4 w-4" /><span className="max-w-48 truncate">{user?.email}</span></div>
+            <button onClick={signOut} className="flex items-center gap-1.5 rounded-md border border-slate-700 px-3 py-1.5 text-xs font-medium text-slate-200 hover:bg-slate-800"><LogOut className="h-4 w-4" />Sign out</button>
           </div>
         </div>
       </div>

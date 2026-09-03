@@ -4,7 +4,8 @@ import re
 import uuid
 import datetime
 from threading import Thread
-from flask import Blueprint, request, jsonify, current_app
+from flask import Blueprint, request, jsonify, current_app, g
+from backend.auth import require_auth
 from backend.config import Config
 from backend.models.job import Job, RuleViolation
 from backend.core.powerbi_auth import PowerBIAuthService
@@ -386,6 +387,7 @@ def run_service_analysis_job(job_id, report_url, checks, auth_token, app_context
 
 
 @service_bp.route('/api/service/connect', methods=['POST'])
+@require_auth
 def service_connect():
     """
     Accepts workspace_id/url and auth_mode.
@@ -426,6 +428,7 @@ def service_connect():
 
 
 @service_bp.route('/api/service/oauth/callback', methods=['POST'])
+@require_auth
 def oauth_callback():
     """
     Exchanges code for AAD access token.
@@ -464,6 +467,7 @@ def oauth_callback():
 
 
 @service_bp.route('/api/service/test', methods=['POST'])
+@require_auth
 def service_test():
     """
     Trigger validation job on live Power BI Service report URL.
@@ -491,6 +495,7 @@ def service_test():
         # Create Job entry in DB
         new_job = Job(
             id=job_id,
+            user_id=g.user_id,
             method="service",
             source=report_url,
             status="queued",

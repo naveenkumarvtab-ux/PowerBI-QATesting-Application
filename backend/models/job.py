@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Uuid
 from sqlalchemy.orm import declarative_base, relationship
 import datetime
 
@@ -8,6 +8,7 @@ class Job(Base):
     __tablename__ = 'jobs'
     
     id = Column(String(36), primary_key=True)
+    user_id = Column(Uuid(as_uuid=False), nullable=False, index=True)
     method = Column(String(50))  # 'pbix' or 'service'
     source = Column(String(500))
     status = Column(String(50), default='queued')  # 'queued', 'running', 'complete', 'failed'

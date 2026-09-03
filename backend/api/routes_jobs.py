@@ -1,6 +1,7 @@
 import os
 import json
-from flask import Blueprint, jsonify, send_file, request, current_app
+from flask import Blueprint, jsonify, send_file, request, current_app, g
+from backend.auth import require_auth
 from backend.models.job import Job, RuleViolation
 from backend.config import Config
 from backend.core.report_builder import ReportBuilder
@@ -12,13 +13,14 @@ def get_db_session():
     return current_app.db_session_factory()
 
 @jobs_bp.route('/api/jobs', methods=['GET'])
+@require_auth
 def list_jobs():
     session = get_db_session()
     try:
         method = request.args.get('method')
         status = request.args.get('status')
         
-        query = session.query(Job)
+        query = session.query(Job).filter(Job.user_id == g.user_id)
         if method:
             query = query.filter(Job.method == method)
         if status:
@@ -33,10 +35,11 @@ def list_jobs():
         session.close()
 
 @jobs_bp.route('/api/jobs/<job_id>/status', methods=['GET'])
+@require_auth
 def get_job_status(job_id):
     session = get_db_session()
     try:
-        job = session.query(Job).filter(Job.id == job_id).first()
+        job = session.query(Job).filter(Job.id == job_id, Job.user_id == g.user_id).first()
         if not job:
             return jsonify({"error": "Job not found"}), 404
             
@@ -54,10 +57,11 @@ def get_job_status(job_id):
         session.close()
 
 @jobs_bp.route('/api/jobs/<job_id>/result', methods=['GET'])
+@require_auth
 def get_job_result(job_id):
     session = get_db_session()
     try:
-        job = session.query(Job).filter(Job.id == job_id).first()
+        job = session.query(Job).filter(Job.id == job_id, Job.user_id == g.user_id).first()
         if not job:
             return jsonify({"error": "Job not found"}), 404
             
@@ -75,10 +79,11 @@ def get_job_result(job_id):
         session.close()
 
 @jobs_bp.route('/api/jobs/<job_id>/report.pdf', methods=['GET'])
+@require_auth
 def download_pdf(job_id):
     session = get_db_session()
     try:
-        job = session.query(Job).filter(Job.id == job_id).first()
+        job = session.query(Job).filter(Job.id == job_id, Job.user_id == g.user_id).first()
         if not job or not job.report_pdf_path or not os.path.exists(job.report_pdf_path):
             return jsonify({"error": "PDF report not found. Verify if the job finished successfully."}), 404
             
@@ -94,6 +99,7 @@ def download_pdf(job_id):
         session.close()
 
 @jobs_bp.route('/api/reports/screenshots/<filename>', methods=['GET'])
+@require_auth
 def get_screenshot(filename):
     screenshot_path = os.path.join(Config.REPORT_FOLDER, "screenshots", filename)
     if not os.path.exists(screenshot_path):

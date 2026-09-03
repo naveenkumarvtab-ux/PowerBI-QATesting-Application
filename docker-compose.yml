@@ -13,6 +13,9 @@ services:
       - CLIENT_ID=
       - CLIENT_SECRET=
       - TENANT_ID=
+      - DATABASE_URL=sqlite:////app/storage/pbi_qa.db
+      - SUPABASE_URL=${SUPABASE_URL:-}
+      - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY:-}
     volumes:
       - backend-storage:/app/storage
 
@@ -24,6 +27,9 @@ services:
     ports:
       - "5173:5173"
     command: sh -c "npm install && npm run dev -- --host"
+    environment:
+      - VITE_SUPABASE_URL=${VITE_SUPABASE_URL:-}
+      - VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY:-}
     depends_on:
       - backend
 

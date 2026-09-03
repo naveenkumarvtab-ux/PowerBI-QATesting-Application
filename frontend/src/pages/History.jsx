@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
+import { downloadProtectedFile } from '../lib/downloads';
 import { 
   History as HistoryIcon, FileText, Download, Calendar, Loader2, PlayCircle, ShieldAlert 
 } from 'lucide-react';
@@ -223,14 +224,13 @@ export default function History() {
                             >
                               <FileText className="h-4 w-4" />
                             </Link>
-                            <a
-                              href={`/api/jobs/${job.job_id}/report.pdf`}
+                            <button
+                              onClick={() => downloadProtectedFile(`/api/jobs/${job.job_id}/report.pdf`, `pbi_qa_report_${job.job_id}.pdf`).catch(() => setError('Unable to download the PDF report.'))}
                               className="p-1 text-slate-500 hover:text-indigo-600 transition-colors"
                               title="Download PDF"
-                              download
                             >
                               <Download className="h-4 w-4" />
-                            </a>
+                            </button>
                           </>
                         ) : (
                           <Link

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import axios from 'axios';
+import { downloadProtectedFile } from '../lib/downloads';
 import { 
   BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer 
 } from 'recharts';
@@ -247,14 +248,13 @@ export default function ReportView() {
           Back to History
         </Link>
         
-        <a
-          href={`/api/jobs/${jobId}/report.pdf`}
-          download
+        <button
+          onClick={() => downloadProtectedFile(`/api/jobs/${jobId}/report.pdf`, `pbi_qa_report_${jobId}.pdf`)}
           className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-lg shadow-sm flex items-center gap-1.5 transition-colors self-start sm:self-auto"
         >
           <Download className="h-4 w-4" />
           Download PDF Report
-        </a>
+        </button>
       </div>
 
       {/* Title block */}

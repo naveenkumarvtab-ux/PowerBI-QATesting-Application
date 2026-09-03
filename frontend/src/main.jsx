@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client'
 import axios from 'axios'
 import App from './App.jsx'
 import './index.css'
+import { AuthProvider } from './contexts/AuthContext.jsx'
 
 // Dynamic API URL resolution:
 // 1. Explicit VITE_API_URL environment variable
@@ -14,7 +15,5 @@ if (apiUrl) {
 }
 
 ReactDOM.createRoot(document.getElementById('root')).render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>,
+  <React.StrictMode><AuthProvider><App /></AuthProvider></React.StrictMode>,
 )

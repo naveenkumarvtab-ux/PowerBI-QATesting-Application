@@ -3,7 +3,8 @@ import json
 import uuid
 import datetime
 from threading import Thread
-from flask import Blueprint, request, jsonify, current_app
+from flask import Blueprint, request, jsonify, current_app, g
+from backend.auth import require_auth
 from werkzeug.utils import secure_filename
 from backend.config import Config
 from backend.models.job import Job, RuleViolation
@@ -268,6 +269,7 @@ def run_pbix_analysis_job(job_id, file_path, upload_name, run_functional, run_pd
 
 
 @pbix_bp.route('/api/pbix/upload', methods=['POST'])
+@require_auth
 def upload_pbix():
     session = current_app.db_session_factory()
     try:
@@ -298,6 +300,7 @@ def upload_pbix():
         # Create Job DB entry
         new_job = Job(
             id=job_id,
+            user_id=g.user_id,
             method="pbix",
             source=filename,
             status="queued",

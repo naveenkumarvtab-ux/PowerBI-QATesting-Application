@@ -12,6 +12,14 @@ class Config:
     
     # Database
     DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///{BASE_DIR}/pbi_qa.db")
+    if DATABASE_URL.startswith("postgres://"):
+        DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql+psycopg://", 1)
+    elif DATABASE_URL.startswith("postgresql://"):
+        DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+psycopg://", 1)
+
+    # Supabase Auth (the anon key is public; never use the service-role key here)
+    SUPABASE_URL = os.getenv("SUPABASE_URL", "")
+    SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY", "")
     
     # Uploads & Reports Directories
     UPLOAD_FOLDER = os.getenv("UPLOAD_FOLDER", str(BASE_DIR / "storage" / "uploads"))

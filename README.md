@@ -115,6 +115,8 @@ VITE_SUPABASE_ANON_KEY=your-anon-key
 
 Never expose the database password or a Supabase service-role key in frontend variables. In Supabase Authentication URL Configuration, add `http://localhost:5173/login` and `http://localhost:5173/reset-password` for local development, plus the equivalent production URLs. A custom SMTP provider such as Brevo is recommended for confirmation and password-recovery delivery.
 
+Password recovery uses an email OTP. In the Supabase **Reset password** email template, include `{{ .Token }}` so the user can enter the code in the application's Forgot Password screen. The app verifies the recovery OTP before allowing a new password and signs out the temporary recovery session after the update.
+
 ---
 
 ## Azure AD (Entra ID) App Registration

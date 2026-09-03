@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
-import { Loader2, LockKeyhole, Mail, TestTube } from 'lucide-react';
+import { Eye, EyeOff, Loader2, LockKeyhole, Mail, TestTube } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -50,9 +50,15 @@ export function AuthCard({ title, subtitle, children }) {
   </div>;
 }
 
-export function Field({ icon: Icon, label, type, value, onChange, autoComplete }) {
+export function Field({ icon: Icon, label, type, value, onChange, autoComplete, ...inputProps }) {
+  const [passwordVisible, setPasswordVisible] = useState(false);
+  const isPassword = type === 'password';
   return <label className="block text-sm font-semibold text-slate-700">{label}
-    <div className="relative mt-1.5"><Icon className="absolute left-3 top-3 h-5 w-5 text-slate-400" /><input required type={type} value={value} onChange={(e) => onChange(e.target.value)} autoComplete={autoComplete} className="w-full rounded-lg border border-slate-300 py-2.5 pl-10 pr-3 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100" /></div>
+    <div className="relative mt-1.5">
+      <Icon className="absolute left-3 top-3 h-5 w-5 text-slate-400" />
+      <input required type={isPassword && passwordVisible ? 'text' : type} value={value} onChange={(e) => onChange(e.target.value)} autoComplete={autoComplete} className={`w-full rounded-lg border border-slate-300 py-2.5 pl-10 ${isPassword ? 'pr-11' : 'pr-3'} outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100`} {...inputProps} />
+      {isPassword && <button type="button" onClick={() => setPasswordVisible((visible) => !visible)} className="absolute right-3 top-2.5 rounded p-0.5 text-slate-400 hover:text-slate-700" aria-label={passwordVisible ? 'Hide password' : 'Show password'}>{passwordVisible ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}</button>}
+    </div>
   </label>;
 }
 

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
 import { Cloud, User, CheckSquare, Square, AlertCircle, Loader2, Settings, LogOut, ExternalLink, ShieldCheck } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function ServiceTest() {
   const [reportUrl, setReportUrl] = useState('');
@@ -32,10 +33,15 @@ export default function ServiceTest() {
 
   const navigate = useNavigate();
   const location = useLocation();
+  const { session: appSession, loading: authLoading } = useAuth();
 
   // Handle OAuth Redirect callback on mount
   useEffect(() => {
     const handleCallback = async () => {
+      // Wait until the application session is restored after the full-page
+      // Microsoft redirect. The callback endpoint itself requires this token.
+      if (authLoading || !appSession?.access_token) return;
+
       // Check query parameters in window.location.search or hash
       const searchString = window.location.search || (window.location.href.includes('?') ? '?' + window.location.href.split('?')[1] : '');
       if (searchString) {
@@ -83,7 +89,7 @@ export default function ServiceTest() {
     };
     
     handleCallback();
-  }, [location, customRedirectUri]);
+  }, [location, customRedirectUri, authLoading, appSession?.access_token]);
 
   const handleMicrosoftSignIn = async () => {
     setConnecting(true);

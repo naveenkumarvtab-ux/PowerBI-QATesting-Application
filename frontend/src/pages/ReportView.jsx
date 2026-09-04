@@ -161,6 +161,12 @@ export default function ReportView() {
     if (targetCat === 'dax_calculated_columns' || targetCat === 'dax_calculated_column_naming') {
       return resCategory === 'dax_calculated_columns' || resCategory === 'dax_calculated_column_naming';
     }
+    if (targetCat === 'export_pdf' || targetCat === 'pdf_export') {
+      return resCategory === 'export_pdf' || resCategory === 'pdf_export';
+    }
+    if (targetCat === 'export_excel' || targetCat === 'excel_export') {
+      return resCategory === 'export_excel' || resCategory === 'export_excel';
+    }
     return resCategory === targetCat;
   };
 
@@ -174,7 +180,14 @@ export default function ReportView() {
     let matchedResults = [];
     if (selectedPage === 'all' || activeTab === 'category') {
       allSectionsForChart.forEach(sec => {
-        if (sec.category === catKey || (catKey === 'dax_calculated_columns' && sec.category === 'dax_calculated_column_naming')) {
+        if (
+          sec.category === catKey || 
+          (catKey === 'dax_calculated_columns' && sec.category === 'dax_calculated_column_naming') ||
+          (catKey === 'export_pdf' && sec.category === 'pdf_export') ||
+          (catKey === 'pdf_export' && sec.category === 'export_pdf') ||
+          (catKey === 'export_excel' && sec.category === 'excel_export') ||
+          (catKey === 'excel_export' && sec.category === 'export_excel')
+        ) {
           matchedResults = [...matchedResults, ...(sec.results || [])];
         }
       });
@@ -199,9 +212,16 @@ export default function ReportView() {
     return { count: matchedResults.length, failed, warnings, passed };
   };
 
-  // Prepare chart data ensuring all 12 categories appear consistently on the axis
+  // Prepare chart data ensuring all categories appear consistently on the axis
   const chartData = allCategoriesList.map(cat => {
-    const sec = allSectionsForChart.find(s => s.category === cat.key || (cat.key === 'dax_calculated_columns' && s.category === 'dax_calculated_column_naming'));
+    const sec = allSectionsForChart.find(s => 
+      s.category === cat.key || 
+      (cat.key === 'dax_calculated_columns' && s.category === 'dax_calculated_column_naming') ||
+      (cat.key === 'export_pdf' && s.category === 'pdf_export') ||
+      (cat.key === 'pdf_export' && s.category === 'export_pdf') ||
+      (cat.key === 'export_excel' && s.category === 'excel_export') ||
+      (cat.key === 'excel_export' && s.category === 'export_excel')
+    );
     const results = sec ? (sec.results || []) : [];
     const passed = results.filter(r => r.status === 'pass').length;
     const warnings = results.filter(r => r.status === 'warning').length;

@@ -311,20 +311,48 @@ class PowerBIAPIClient:
         Downloads report PBIX binary from Power BI Service to enable full layout analysis.
         Endpoint: GET https://api.powerbi.com/v1.0/myorg/groups/{workspace_id}/reports/{report_id}/Export
         """
+        target_path = os.path.join(Config.UPLOAD_FOLDER, f"service_{report_id}.pbix")
+
         if self.is_mock:
+            if os.path.exists(target_path) and os.path.getsize(target_path) > 1000:
+                return target_path
+            uploads_dir = Config.UPLOAD_FOLDER
+            import glob
+            pbix_files = glob.glob(os.path.join(uploads_dir, "*.pbix"))
+            if pbix_files:
+                pbix_files.sort(key=os.path.getmtime, reverse=True)
+                return pbix_files[0]
             return None
-        url = f"{self.base_url}/groups/{workspace_id}/reports/{report_id}/Export"
-        res = requests.get(url, headers=self.headers, stream=True)
-        if res.status_code == 200:
-            os.makedirs(Config.UPLOAD_FOLDER, exist_ok=True)
-            target_path = os.path.join(Config.UPLOAD_FOLDER, f"service_{report_id}.pbix")
-            with open(target_path, "wb") as f:
-                for chunk in res.iter_content(chunk_size=65536):
-                    f.write(chunk)
+
+        # 1. Attempt live Export API download
+        try:
+            url = f"{self.base_url}/groups/{workspace_id}/reports/{report_id}/Export"
+            res = requests.get(url, headers=self.headers, stream=True, timeout=60)
+            if res.status_code == 200:
+                os.makedirs(Config.UPLOAD_FOLDER, exist_ok=True)
+                with open(target_path, "wb") as f:
+                    for chunk in res.iter_content(chunk_size=65536):
+                        f.write(chunk)
+                return target_path
+            else:
+                print(f"PBIX export returned HTTP {res.status_code}")
+        except Exception as e:
+            print(f"PBIX export API request error: {e}")
+
+        # 2. Check for previously downloaded/cached PBIX for this report
+        if os.path.exists(target_path) and os.path.getsize(target_path) > 1000:
+            print(f"Using cached PBIX file for report {report_id}: {target_path}")
             return target_path
-        else:
-            print(f"PBIX export returned HTTP {res.status_code}")
-            return None
+
+        # 3. Fallback to any recent PBIX in uploads directory
+        import glob
+        existing_pbix = glob.glob(os.path.join(Config.UPLOAD_FOLDER, "*.pbix"))
+        if existing_pbix:
+            existing_pbix.sort(key=os.path.getmtime, reverse=True)
+            print(f"Using fallback PBIX file from uploads: {existing_pbix[0]}")
+            return existing_pbix[0]
+
+        return None
 
     def get_dataset_refreshes(self, workspace_id, dataset_id, top=5):
         """

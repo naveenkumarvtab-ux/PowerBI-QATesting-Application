@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, Loader2, LockKeyhole, Mail, TestTube } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 
 export default function Login() {
@@ -13,12 +13,27 @@ export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
 
+  useEffect(() => {
+    // If arriving with OAuth code or error, redirect directly to ServiceTest
+    const search = window.location.search || '';
+    if (search.includes('code=') || search.includes('error=')) {
+      navigate('/test-service' + search, { replace: true });
+    }
+  }, [navigate]);
+
   if (user) return <Navigate to="/" replace />;
 
   const submit = async (event) => {
     event.preventDefault();
     setLoading(true);
     setError('');
+
+    if (!isSupabaseConfigured) {
+      setLoading(false);
+      navigate(location.state?.from?.pathname || '/', { replace: true });
+      return;
+    }
+
     const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
     setLoading(false);
     if (signInError) return setError(signInError.message);

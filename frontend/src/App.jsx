@@ -19,10 +19,12 @@ function ApplicationLayout() {
 
 export default function App() {
   useEffect(() => {
-    // Intercept Microsoft OAuth responses landing on the root URL.
-    const search = window.location.search;
-    if (window.location.pathname === '/' && search && (search.includes('code=') || search.includes('error='))) {
-      window.location.replace(window.location.origin + '/test-service' + search);
+    // Intercept Microsoft OAuth responses landing anywhere and forward to /test-service
+    const search = window.location.search || '';
+    if (search && (search.includes('code=') || search.includes('error='))) {
+      if (!window.location.pathname.includes('/test-service')) {
+        window.location.replace(window.location.origin + '/test-service' + search);
+      }
     }
   }, []);
   return (

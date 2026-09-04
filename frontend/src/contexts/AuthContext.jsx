@@ -1,14 +1,27 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
-import { supabase } from '../lib/supabase';
+import { supabase, isSupabaseConfigured } from '../lib/supabase';
 
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
-  const [session, setSession] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [session, setSession] = useState(() => {
+    if (!isSupabaseConfigured) {
+      return {
+        access_token: 'local-dev-token',
+        user: { id: '00000000-0000-0000-0000-000000000000', email: 'dev@pbi-qa.local' }
+      };
+    }
+    return null;
+  });
+  const [loading, setLoading] = useState(isSupabaseConfigured);
 
   useEffect(() => {
+    if (!isSupabaseConfigured) {
+      setLoading(false);
+      return;
+    }
+
     supabase.auth.getSession().then(({ data }) => {
       setSession(data.session);
       setLoading(false);
@@ -34,7 +47,13 @@ export function AuthProvider({ children }) {
     session,
     user: session?.user ?? null,
     loading,
-    signOut: () => supabase.auth.signOut(),
+    isSupabaseConfigured,
+    signOut: () => {
+      if (isSupabaseConfigured) {
+        return supabase.auth.signOut();
+      }
+      setSession(null);
+    },
   }), [session, loading]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

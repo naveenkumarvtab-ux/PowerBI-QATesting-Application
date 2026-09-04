@@ -312,32 +312,23 @@ class PowerBIAPIClient:
         Endpoint: GET https://api.powerbi.com/v1.0/myorg/groups/{workspace_id}/reports/{report_id}/Export
         """
         target_path = os.path.join(Config.UPLOAD_FOLDER, f"service_{report_id}.pbix")
+        sample_models_dir = os.path.join(os.path.dirname(__file__), "sample_models")
 
-        if self.is_mock:
-            if os.path.exists(target_path) and os.path.getsize(target_path) > 1000:
-                return target_path
-            uploads_dir = Config.UPLOAD_FOLDER
-            import glob
-            pbix_files = glob.glob(os.path.join(uploads_dir, "*.pbix"))
-            if pbix_files:
-                pbix_files.sort(key=os.path.getmtime, reverse=True)
-                return pbix_files[0]
-            return None
-
-        # 1. Attempt live Export API download
-        try:
-            url = f"{self.base_url}/groups/{workspace_id}/reports/{report_id}/Export"
-            res = requests.get(url, headers=self.headers, stream=True, timeout=60)
-            if res.status_code == 200:
-                os.makedirs(Config.UPLOAD_FOLDER, exist_ok=True)
-                with open(target_path, "wb") as f:
-                    for chunk in res.iter_content(chunk_size=65536):
-                        f.write(chunk)
-                return target_path
-            else:
-                print(f"PBIX export returned HTTP {res.status_code}")
-        except Exception as e:
-            print(f"PBIX export API request error: {e}")
+        # 1. Attempt live Export API download if not in mock mode
+        if not self.is_mock:
+            try:
+                url = f"{self.base_url}/groups/{workspace_id}/reports/{report_id}/Export"
+                res = requests.get(url, headers=self.headers, stream=True, timeout=60)
+                if res.status_code == 200:
+                    os.makedirs(Config.UPLOAD_FOLDER, exist_ok=True)
+                    with open(target_path, "wb") as f:
+                        for chunk in res.iter_content(chunk_size=65536):
+                            f.write(chunk)
+                    return target_path
+                else:
+                    print(f"PBIX export returned HTTP {res.status_code}")
+            except Exception as e:
+                print(f"PBIX export API request error: {e}")
 
         # 2. Check for previously downloaded/cached PBIX for this report
         if os.path.exists(target_path) and os.path.getsize(target_path) > 1000:
@@ -345,7 +336,6 @@ class PowerBIAPIClient:
             return target_path
 
         # 3. Check bundled sample models directory (always packaged in cloud deployments)
-        sample_models_dir = os.path.join(os.path.dirname(__file__), "sample_models")
         specific_sample = os.path.join(sample_models_dir, f"service_{report_id}.pbix")
         if os.path.exists(specific_sample) and os.path.getsize(specific_sample) > 1000:
             print(f"Using bundled PBIX model for report {report_id}: {specific_sample}")

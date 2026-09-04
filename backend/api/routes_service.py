@@ -139,20 +139,12 @@ def run_service_analysis_job(job_id, report_url, checks, auth_token, app_context
                     except Exception as rfe:
                         print(f"Dataset refresh check notice: {rfe}")
 
-                # 2. Download PBIX from Service for full deep analysis
+                # 2. Download PBIX from Service for full deep analysis (with bundled fallback)
                 pbix_file = None
-                if Config.MOCK_SERVICE:
-                    uploads_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "storage", "uploads")
-                    import glob
-                    pbix_files = glob.glob(os.path.join(uploads_dir, "*.pbix"))
-                    if pbix_files:
-                        pbix_files.sort(key=os.path.getmtime, reverse=True)
-                        pbix_file = pbix_files[0]
-                else:
-                    try:
-                        pbix_file = api_client.download_report_pbix(workspace_id, report_id)
-                    except Exception as de:
-                        print(f"Failed to download report PBIX from service: {de}")
+                try:
+                    pbix_file = api_client.download_report_pbix(workspace_id, report_id)
+                except Exception as de:
+                    print(f"Failed to download report PBIX from service: {de}")
 
                 # 3. Parse PBIX file if available
                 parsed_meta = {}

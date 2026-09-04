@@ -344,12 +344,27 @@ class PowerBIAPIClient:
             print(f"Using cached PBIX file for report {report_id}: {target_path}")
             return target_path
 
-        # 3. Fallback to any recent PBIX in uploads directory
+        # 3. Check bundled sample models directory (always packaged in cloud deployments)
+        sample_models_dir = os.path.join(os.path.dirname(__file__), "sample_models")
+        specific_sample = os.path.join(sample_models_dir, f"service_{report_id}.pbix")
+        if os.path.exists(specific_sample) and os.path.getsize(specific_sample) > 1000:
+            print(f"Using bundled PBIX model for report {report_id}: {specific_sample}")
+            return specific_sample
+
+        default_sample = os.path.join(sample_models_dir, "default_report.pbix")
+        if os.path.exists(default_sample) and os.path.getsize(default_sample) > 1000:
+            print(f"Using bundled default PBIX model: {default_sample}")
+            return default_sample
+
+        # 4. Fallback to any recent PBIX in uploads directory or sample_models
         import glob
-        existing_pbix = glob.glob(os.path.join(Config.UPLOAD_FOLDER, "*.pbix"))
+        existing_pbix = (
+            glob.glob(os.path.join(Config.UPLOAD_FOLDER, "*.pbix")) + 
+            glob.glob(os.path.join(sample_models_dir, "*.pbix"))
+        )
         if existing_pbix:
             existing_pbix.sort(key=os.path.getmtime, reverse=True)
-            print(f"Using fallback PBIX file from uploads: {existing_pbix[0]}")
+            print(f"Using fallback PBIX file from uploads/sample_models: {existing_pbix[0]}")
             return existing_pbix[0]
 
         return None

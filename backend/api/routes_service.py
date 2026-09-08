@@ -45,7 +45,7 @@ def extract_ids_from_url(url):
         
     return workspace_id, report_id
 
-def run_service_analysis_job(job_id, report_url, checks, auth_token, app_context):
+def run_service_analysis_job(job_id, report_url, checks, auth_token, app_context, expected_font=None):
     """
     Background thread running service tests: Naming, Functional, PDF Export, Excel Export.
     Each check runs independently and appends violations.
@@ -151,7 +151,7 @@ def run_service_analysis_job(job_id, report_url, checks, auth_token, app_context
                 layout_str = None
                 if pbix_file:
                     try:
-                        parser = PBIXParser(pbix_file)
+                        parser = PBIXParser(pbix_file, expected_font=expected_font)
                         parsed_meta = parser.parse()
                         layout_str = parsed_meta.get("layout_str")
                         job.layout_str = layout_str
@@ -471,6 +471,7 @@ def service_test():
         checks = data.get("checks", ["naming", "functional", "export_pdf", "export_excel"])
         auth_mode = data.get("auth_mode", "service_principal")
         token = data.get("token")  # If passed from frontend direct, or we fetch from principal
+        expected_font = data.get("expected_font")
         
         if not report_url:
             return jsonify({"error": "report_url is required"}), 400
@@ -501,7 +502,7 @@ def service_test():
         app_context = current_app._get_current_object().app_context()
         thread = Thread(
             target=run_service_analysis_job,
-            args=(job_id, report_url, checks, token, app_context)
+            args=(job_id, report_url, checks, token, app_context, expected_font)
         )
         thread.start()
 

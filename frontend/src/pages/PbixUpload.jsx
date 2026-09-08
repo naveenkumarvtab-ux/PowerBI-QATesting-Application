@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { FileUp, File, AlertCircle, Loader2 } from 'lucide-react';
+import { FileUp, File, AlertCircle, Loader2, CheckCircle2, Type, Clock, ArrowLeft, Sparkles, ShieldCheck } from 'lucide-react';
 
 export default function PbixUpload() {
   const [file, setFile] = useState(null);
@@ -9,14 +9,40 @@ export default function PbixUpload() {
   const [error, setError] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [expectedFont, setExpectedFont] = useState('Segoe UI');
   
   const navigate = useNavigate();
   const fileInputRef = useRef(null);
+  const timerRef = useRef(null);
 
-  // Pre-warm backend when page opens (wakes up sleeping Render instance)
+  const ESTIMATED_SECONDS = 30;
+  const [countdownSeconds, setCountdownSeconds] = useState(ESTIMATED_SECONDS);
+
+  // Pre-warm backend when page opens
   useEffect(() => {
     axios.get('/api/health').catch(() => {});
   }, []);
+
+  // Timer effect during upload/execution
+  useEffect(() => {
+    if (uploading) {
+      setCountdownSeconds(ESTIMATED_SECONDS);
+      timerRef.current = setInterval(() => {
+        setCountdownSeconds((prev) => (prev > 0 ? prev - 1 : 0));
+      }, 1000);
+    } else {
+      if (timerRef.current) clearInterval(timerRef.current);
+    }
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, [uploading]);
+
+  const formatTimer = (seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}s`;
+  };
 
   const handleDrag = (e) => {
     e.preventDefault();
@@ -60,6 +86,7 @@ export default function PbixUpload() {
     
     setUploading(true);
     setError(null);
+    setUploadProgress(0);
     
     const formData = new FormData();
     formData.append('file', file);
@@ -67,11 +94,13 @@ export default function PbixUpload() {
     formData.append('run_pdf', 'true');
     formData.append('run_excel', 'true');
     formData.append('auth_mode', 'service_principal');
+    if (expectedFont && expectedFont.trim()) {
+      formData.append('expected_font', expectedFont.trim());
+    }
     
     try {
-      // Do not manually set Content-Type header so Axios generates the multipart boundary automatically
       const response = await axios.post('/api/pbix/upload', formData, {
-        timeout: 180000,
+        timeout: 240000,
         onUploadProgress: (progressEvent) => {
           if (progressEvent.total) {
             const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
@@ -89,7 +118,7 @@ export default function PbixUpload() {
       if (serverError) {
         setError(serverError);
       } else if (err.code === 'ECONNABORTED' || err.message?.includes('timeout') || err.message?.includes('Network Error')) {
-        setError("Connection timeout or network error. The Render backend server may be waking up from sleep. Please wait 15 seconds and try again.");
+        setError("Connection timeout or network error. Please try again.");
       } else {
         setError("Failed to upload file and execute tests. Please try again.");
       }
@@ -98,116 +127,195 @@ export default function PbixUpload() {
     }
   };
 
+  const fontPresets = ['Segoe UI', 'Calibri', 'Arial', 'DIN', 'Segoe UI Semibold', 'Georgia'];
+
   return (
-    <div className="max-w-xl mx-auto py-8 space-y-6">
-      <div className="mb-2">
-        <h1 className="text-2xl font-bold text-slate-900">Upload PBIX File</h1>
+    <div className="max-w-4xl mx-auto py-8 px-4 sm:px-6 space-y-6">
+      {/* Back to Landing navigation */}
+      <button 
+        onClick={() => navigate('/landing')}
+        className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 hover:text-indigo-600 transition-colors"
+      >
+        <ArrowLeft className="h-4 w-4" />
+        Back to Process Selection
+      </button>
+
+      {/* Header */}
+      <div>
+        <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">Local PBIX File Validation</h1>
         <p className="text-slate-600 text-sm mt-1">
-          Upload your Power BI template or report file to execute the complete QA suite.
+          Upload your offline Power BI file to run full static formula, layout, font consistency, and model checks.
         </p>
       </div>
 
-      <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm space-y-6">
+      <div className="bg-white border border-slate-200 rounded-2xl p-6 sm:p-8 shadow-sm space-y-6">
         {/* Drag and Drop Zone */}
-        <div
-          onDragEnter={handleDrag}
-          onDragOver={handleDrag}
-          onDragLeave={handleDrag}
-          onDrop={handleDrop}
-          onClick={() => !uploading && fileInputRef.current.click()}
-          className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all flex flex-col items-center justify-center min-h-[200px] ${
-            dragActive ? 'border-indigo-500 bg-indigo-50/50' : 'border-slate-300 hover:border-indigo-400 bg-slate-50'
-          } ${uploading ? 'pointer-events-none opacity-60' : ''}`}
-        >
-          <input
-            ref={fileInputRef}
-            type="file"
-            className="hidden"
-            accept=".pbix"
-            onChange={handleChange}
-          />
+        <div>
+          <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">
+            1. Select or Drop Power BI File (.pbix)
+          </label>
           
-          <FileUp className="h-10 w-10 text-slate-400 mb-3" />
-          
-          {file ? (
-            <div className="flex items-center gap-2 max-w-full">
-              <File className="h-5 w-5 text-indigo-500 flex-shrink-0" />
-              <span className="font-semibold text-slate-800 truncate text-sm">{file.name}</span>
-              <span className="text-xs text-slate-500 flex-shrink-0">
-                ({(file.size / (1024 * 1024)).toFixed(2)} MB)
-              </span>
-            </div>
-          ) : (
-            <div>
-              <p className="font-semibold text-slate-800 text-sm">
-                Drag and drop your PBIX file here, or <span className="text-indigo-600">browse</span>
-              </p>
-              <p className="text-slate-500 text-xs mt-1">Supports standard Power BI files up to 200MB</p>
-            </div>
-          )}
+          <div
+            onDragEnter={handleDrag}
+            onDragOver={handleDrag}
+            onDragLeave={handleDrag}
+            onDrop={handleDrop}
+            onClick={() => !uploading && fileInputRef.current.click()}
+            className={`border-2 border-dashed rounded-xl p-6 sm:p-8 text-center cursor-pointer transition-all flex flex-col items-center justify-center min-h-[190px] ${
+              dragActive 
+                ? 'border-indigo-500 bg-indigo-50/50' 
+                : file 
+                  ? 'border-emerald-400 bg-emerald-50/30' 
+                  : 'border-slate-300 hover:border-indigo-400 bg-slate-50'
+            } ${uploading ? 'pointer-events-none opacity-60' : ''}`}
+          >
+            <input
+              ref={fileInputRef}
+              type="file"
+              className="hidden"
+              accept=".pbix"
+              onChange={handleChange}
+            />
+            
+            {file ? (
+              <div className="flex flex-col items-center gap-2">
+                <div className="h-12 w-12 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center shadow-sm">
+                  <CheckCircle2 className="h-6 w-6" />
+                </div>
+                <div className="flex items-center gap-2 max-w-full mt-1">
+                  <File className="h-4 w-4 text-emerald-600 flex-shrink-0" />
+                  <span className="font-bold text-slate-900 truncate text-sm">{file.name}</span>
+                  <span className="text-xs font-medium text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full flex-shrink-0">
+                    {(file.size / (1024 * 1024)).toFixed(2)} MB
+                  </span>
+                </div>
+                <p className="text-xs font-semibold text-emerald-700 mt-1">
+                  ✓ File uploaded and ready for QA testing. Click to replace.
+                </p>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center">
+                <div className="h-12 w-12 rounded-full bg-indigo-50 text-indigo-500 flex items-center justify-center mb-3">
+                  <FileUp className="h-6 w-6" />
+                </div>
+                <p className="font-semibold text-slate-800 text-sm">
+                  Drag & drop your PBIX file here, or <span className="text-indigo-600 underline">browse computer</span>
+                </p>
+                <p className="text-slate-500 text-xs mt-1">Supports all Power BI Desktop formats up to 200MB</p>
+              </div>
+            )}
+          </div>
         </div>
 
-        {/* Info Box */}
-        {!uploading && (
-          <div className="p-3 bg-indigo-50/50 border border-indigo-100 rounded-lg text-indigo-950 text-xs leading-relaxed">
-            <span className="font-bold block mb-1">💡 Automated Audit Run Includes:</span>
-            <ul className="list-disc pl-4 space-y-1 text-indigo-900/90">
-              <li>Formula naming standards & DAX complexity scanning</li>
-              <li>Unused measures & duplicate calculations analysis</li>
-              <li>Playwright browser functional page render & bookmark tests</li>
-              <li>Power BI Service cloud PDF and Excel export verifications</li>
-            </ul>
+        {/* Font Consistency Validation Configuration */}
+        <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
+          <div className="flex items-center justify-between">
+            <label className="text-xs font-bold uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
+              <Type className="h-4 w-4 text-indigo-600" />
+              2. Expected Font Consistency Validation
+            </label>
+            <span className="text-[11px] text-slate-500 font-medium">Headers & Values</span>
+          </div>
+
+          <p className="text-xs text-slate-600 leading-relaxed">
+            Enter the brand/theme font family expected in this report. The QA engine validates that visual titles, axis headers, and value/data labels match this font.
+          </p>
+
+          <div>
+            <input
+              type="text"
+              value={expectedFont}
+              onChange={(e) => setExpectedFont(e.target.value)}
+              placeholder="e.g. Segoe UI, Calibri, Arial, DIN..."
+              className="w-full px-3.5 py-2 text-sm bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 font-medium text-slate-800 shadow-sm"
+            />
+          </div>
+
+          {/* Preset Chips */}
+          <div className="flex flex-wrap items-center gap-1.5 pt-1">
+            <span className="text-[11px] text-slate-500 font-medium mr-1">Presets:</span>
+            {fontPresets.map((font) => (
+              <button
+                key={font}
+                type="button"
+                onClick={() => setExpectedFont(font)}
+                className={`px-2.5 py-1 text-xs rounded-md transition-colors ${
+                  expectedFont.toLowerCase() === font.toLowerCase()
+                    ? 'bg-indigo-600 text-white font-semibold shadow-xs'
+                    : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-100'
+                }`}
+              >
+                {font}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Live Elapsed Time & Progress Bar */}
+        {uploading && (
+          <div className="p-4 bg-indigo-50/70 border border-indigo-100 rounded-xl space-y-3">
+            <div className="flex items-center justify-between text-xs font-semibold text-indigo-900">
+              <span className="flex items-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin text-indigo-600" />
+                <span>Uploading file & running QA test suite...</span>
+              </span>
+              <span className="flex items-center gap-1 bg-white px-2.5 py-1 rounded-full border border-indigo-200 text-indigo-700 font-mono text-xs">
+                <Clock className="h-3.5 w-3.5 text-indigo-500" />
+                {countdownSeconds > 0 ? `Est. ${formatTimer(countdownSeconds)} left` : 'Finalizing...'}
+              </span>
+            </div>
+
+            <div className="space-y-1">
+              <div className="flex justify-between text-[11px] text-indigo-700 font-medium">
+                <span>Upload Progress</span>
+                <span>{uploadProgress}%</span>
+              </div>
+              <div className="w-full bg-indigo-100 rounded-full h-2 overflow-hidden">
+                <div 
+                  className="bg-indigo-600 h-full transition-all duration-300"
+                  style={{ width: `${uploadProgress}%` }}
+                ></div>
+              </div>
+            </div>
           </div>
         )}
 
         {/* Error Alert */}
         {error && (
-          <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-xs flex items-start gap-2">
-            <AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5" />
-            <span>{error}</span>
-          </div>
-        )}
-
-        {/* Upload Progress */}
-        {uploading && (
-          <div className="mt-4">
-            <div className="flex justify-between text-xs text-slate-600 font-medium mb-1">
-              <span className="flex items-center gap-1">
-                <Loader2 className="h-3 w-3 animate-spin text-indigo-500" />
-                Uploading & running complete QA tests...
-              </span>
-              <span>{uploadProgress}%</span>
-            </div>
-            <div className="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
-              <div 
-                className="bg-indigo-600 h-full transition-all duration-300"
-                style={{ width: `${uploadProgress}%` }}
-              ></div>
+          <div className="p-3.5 bg-red-50 border border-red-200 rounded-xl text-red-700 text-xs flex items-start gap-2.5">
+            <AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5 text-red-600" />
+            <div className="space-y-0.5">
+              <span className="font-bold block">Upload failed:</span>
+              <p>{error}</p>
             </div>
           </div>
         )}
 
-        {/* Action Buttons */}
-        <div className="flex gap-3 justify-end pt-2 border-t border-slate-100">
+        {/* Actions Footer */}
+        <div className="flex items-center justify-between pt-4 border-t border-slate-100">
           <button
-            onClick={() => navigate('/')}
+            onClick={() => navigate('/landing')}
             disabled={uploading}
             className="px-4 py-2 border border-slate-200 text-slate-700 text-xs font-semibold rounded-lg hover:bg-slate-100 disabled:opacity-50 transition-colors"
           >
             Cancel
           </button>
+
           <button
             onClick={handleUpload}
             disabled={!file || uploading}
-            className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-lg shadow-sm disabled:opacity-50 flex items-center gap-1.5 transition-colors"
+            className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl shadow-md disabled:opacity-50 flex items-center gap-2 transition-all cursor-pointer"
           >
             {uploading ? (
               <>
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                Executing tests...
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span>Running QA Suite ({countdownSeconds > 0 ? formatTimer(countdownSeconds) : 'Finalizing'})...</span>
               </>
             ) : (
-              'Run QA Suite'
+              <>
+                <Sparkles className="h-4 w-4" />
+                <span>Run QA Test Suite</span>
+              </>
             )}
           </button>
         </div>

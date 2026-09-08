@@ -10,8 +10,8 @@ export default function Navbar() {
   const isActive = (path) => location.pathname === path;
 
   return (
-    <nav className="bg-slate-900 text-white shadow-md">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <nav className="bg-slate-900 text-white shadow-md w-full">
+      <div className="w-full px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           <div className="flex items-center gap-8">
             {/* Logo */}
@@ -25,13 +25,23 @@ export default function Navbar() {
               <Link
                 to="/"
                 className={`px-3 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-1.5 ${
-                  isActive('/') || isActive('/upload-pbix') || isActive('/test-service')
+                  isActive('/')
+                    ? 'bg-slate-800 text-indigo-400'
+                    : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                }`}
+              >
+                Home
+              </Link>
+              <Link
+                to="/landing"
+                className={`px-3 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-1.5 ${
+                  isActive('/landing') || isActive('/upload-pbix') || isActive('/test-service')
                     ? 'bg-slate-800 text-indigo-400'
                     : 'text-slate-300 hover:bg-slate-800 hover:text-white'
                 }`}
               >
                 <TestTube className="h-4 w-4" />
-                New Test
+                QA Test Suite
               </Link>
               <Link
                 to="/history"

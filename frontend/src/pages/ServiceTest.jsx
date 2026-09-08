@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
-import { Cloud, User, CheckSquare, Square, AlertCircle, Loader2, Settings, LogOut, ExternalLink, ShieldCheck } from 'lucide-react';
+import { Cloud, User, CheckSquare, Square, AlertCircle, Loader2, Settings, LogOut, ExternalLink, ShieldCheck, ArrowLeft, Clock } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 export default function ServiceTest() {
@@ -26,14 +26,38 @@ export default function ServiceTest() {
     export_excel: true
   });
   
+  const [expectedFont, setExpectedFont] = useState('Segoe UI');
   const [connecting, setConnecting] = useState(false);
   const [running, setRunning] = useState(false);
+  const ESTIMATED_SECONDS = 30;
+  const [countdownSeconds, setCountdownSeconds] = useState(ESTIMATED_SECONDS);
   const [error, setError] = useState(null);
   const [successMsg, setSuccessMsg] = useState(null);
 
   const navigate = useNavigate();
   const location = useLocation();
+  const timerRef = React.useRef(null);
   const { session: appSession, loading: authLoading } = useAuth();
+
+  useEffect(() => {
+    if (running) {
+      setCountdownSeconds(ESTIMATED_SECONDS);
+      timerRef.current = setInterval(() => {
+        setCountdownSeconds((prev) => (prev > 0 ? prev - 1 : 0));
+      }, 1000);
+    } else {
+      if (timerRef.current) clearInterval(timerRef.current);
+    }
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, [running]);
+
+  const formatTimer = (seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}s`;
+  };
 
   // Handle OAuth Redirect callback on mount
   useEffect(() => {
@@ -164,7 +188,8 @@ export default function ServiceTest() {
         report_url: reportUrl.trim(),
         checks: activeChecks,
         auth_mode: 'delegated',
-        token: token
+        token: token,
+        expected_font: expectedFont.trim() || undefined
       });
       
       const jobId = response.data.job_id;
@@ -177,10 +202,21 @@ export default function ServiceTest() {
     }
   };
 
+  const fontPresets = ['Segoe UI', 'Calibri', 'Arial', 'DIN', 'Segoe UI Semibold', 'Georgia'];
+
   return (
-    <div className="max-w-2xl mx-auto py-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-slate-900">Power BI Service Testing</h1>
+    <div className="max-w-4xl mx-auto py-8 px-4 sm:px-6 space-y-6">
+      {/* Back button */}
+      <button 
+        onClick={() => navigate('/landing')}
+        className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 hover:text-indigo-600 transition-colors"
+      >
+        <ArrowLeft className="h-4 w-4" />
+        Back to Process Selection
+      </button>
+
+      <div>
+        <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">Power BI Service Testing</h1>
         <p className="text-slate-600 text-sm mt-1">
           Authenticate with Microsoft to read and audit live Power BI Service reports, datasets, and visuals.
         </p>
@@ -248,42 +284,41 @@ export default function ServiceTest() {
                         setCustomClientId(e.target.value);
                         localStorage.setItem('pbi_custom_client_id', e.target.value);
                       }}
-                      className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg font-mono text-xs focus:outline-none focus:border-indigo-500 shadow-sm"
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg font-mono text-xs focus:outline-none focus:border-indigo-500 bg-white"
                     />
                   </div>
 
                   <div>
                     <label className="block font-semibold text-slate-700 mb-1">
-                      Directory (Tenant) ID <span className="text-indigo-600 font-normal">(Required for Single-Tenant Apps)</span>
+                      Directory (Tenant) ID <span className="text-rose-500">*</span>
                     </label>
                     <input
                       type="text"
-                      placeholder="e.g. xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                      placeholder="e.g. d96cb34e-74be-402e-83f8-b2d504c4bcfa"
                       value={customTenantId}
                       onChange={(e) => {
                         setCustomTenantId(e.target.value);
                         localStorage.setItem('pbi_custom_tenant_id', e.target.value);
                       }}
-                      className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg font-mono text-xs focus:outline-none focus:border-indigo-500 shadow-sm"
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg font-mono text-xs focus:outline-none focus:border-indigo-500 bg-white"
                     />
-                    <p className="text-[10px] text-slate-500 mt-1">
-                      💡 Found in <strong>Azure Portal $\rightarrow$ Microsoft Entra ID $\rightarrow$ Overview</strong>.
-                    </p>
                   </div>
 
-                  <div className="pt-2 border-t border-slate-200 space-y-1.5">
-                    <label className="block font-semibold text-slate-700">
-                      Redirect URI <span className="text-slate-400 font-normal">(Auto-configured — must match Azure Portal)</span>
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">
+                      Azure Redirect URI (SPA Web Platform)
                     </label>
-                    <div className="flex items-center gap-2 px-3 py-2 bg-green-50 border border-green-300 rounded-lg">
-                      <ShieldCheck className="h-4 w-4 text-green-600 flex-shrink-0" />
-                      <code className="text-xs text-green-800 font-mono font-bold flex-1">{window.location.origin}</code>
-                      <span className="text-[10px] text-green-600 font-medium">✓ Correct</span>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        readOnly
+                        value={CLEAN_REDIRECT_URI}
+                        className="w-full px-3 py-2 border border-slate-200 bg-slate-100 rounded-lg font-mono text-xs text-slate-600 cursor-default"
+                      />
+                      <span className="text-[10px] text-emerald-700 font-bold bg-emerald-50 border border-emerald-200 px-2 py-1.5 rounded-lg whitespace-nowrap">
+                        Auto-detected
+                      </span>
                     </div>
-                    <p className="text-[10px] text-slate-500">
-                      ⚠️ Do NOT use <code className="text-red-600">#/test-service</code> — hash fragments are never sent to Azure and cause mismatch errors.
-                      Register exactly <code className="font-mono font-bold">{window.location.origin}</code> in Azure Portal.
-                    </p>
                   </div>
                 </div>
               </div>
@@ -291,23 +326,23 @@ export default function ServiceTest() {
               <button
                 type="button"
                 onClick={handleMicrosoftSignIn}
-                disabled={connecting || !customClientId.trim()}
-                className="w-full py-3 bg-slate-900 hover:bg-slate-800 text-white text-sm font-semibold rounded-xl shadow-sm flex items-center justify-center gap-2.5 transition-colors disabled:opacity-50"
+                disabled={connecting}
+                className="w-full py-3 bg-[#2F2F2F] hover:bg-black text-white text-xs font-bold rounded-xl shadow flex items-center justify-center gap-2.5 transition-colors disabled:opacity-50"
               >
                 {connecting ? (
                   <>
-                    <Loader2 className="h-4 w-4 animate-spin text-indigo-400" />
-                    Connecting to Microsoft Sign-In...
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Connecting with Microsoft Identity...
                   </>
                 ) : (
                   <>
-                    <svg className="h-4 w-4" viewBox="0 0 21 21" fill="none">
-                      <rect x="1" y="1" width="9" height="9" fill="#F25022"/>
-                      <rect x="11" y="1" width="9" height="9" fill="#7FBA00"/>
-                      <rect x="1" y="11" width="9" height="9" fill="#00A4EF"/>
-                      <rect x="11" y="11" width="9" height="9" fill="#FFB900"/>
+                    <svg className="h-4 w-4" viewBox="0 0 23 23">
+                      <path fill="#f35325" d="M1 1h10v10H1z"/>
+                      <path fill="#81bc06" d="M12 1h10v10H12z"/>
+                      <path fill="#05a6f0" d="M1 12h10v10H1z"/>
+                      <path fill="#ffba08" d="M12 12h10v10H12z"/>
                     </svg>
-                    Sign In with Microsoft
+                    Sign in with Work or School Account (Azure AD)
                   </>
                 )}
               </button>
@@ -332,10 +367,50 @@ export default function ServiceTest() {
           </p>
         </div>
 
-        {/* Step 3: QA Audits Selection */}
+        {/* Step 2.5: Expected Font Family Check */}
+        <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
+          <div className="flex items-center justify-between">
+            <label className="text-xs font-bold uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
+              3. Expected Font Consistency Validation
+            </label>
+            <span className="text-[11px] text-slate-500 font-medium">Headers & Values</span>
+          </div>
+
+          <p className="text-xs text-slate-600 leading-relaxed">
+            Enter expected brand/theme font to validate visual titles and data labels across the published report.
+          </p>
+
+          <input
+            type="text"
+            value={expectedFont}
+            onChange={(e) => setExpectedFont(e.target.value)}
+            placeholder="e.g. Segoe UI, Calibri, Arial..."
+            className="w-full px-3.5 py-2 text-sm bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-800 shadow-sm"
+          />
+
+          <div className="flex flex-wrap items-center gap-1.5 pt-1">
+            <span className="text-[11px] text-slate-500 font-medium mr-1">Presets:</span>
+            {fontPresets.map((font) => (
+              <button
+                key={font}
+                type="button"
+                onClick={() => setExpectedFont(font)}
+                className={`px-2.5 py-1 text-xs rounded-md transition-colors ${
+                  expectedFont.toLowerCase() === font.toLowerCase()
+                    ? 'bg-indigo-600 text-white font-semibold shadow-xs'
+                    : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-100'
+                }`}
+              >
+                {font}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Step 4: QA Audits Selection */}
         <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
           <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">
-            3. Select QA Audits to Execute
+            4. Select QA Audits to Execute
           </label>
           <div className="space-y-3">
             <div 
@@ -376,13 +451,26 @@ export default function ServiceTest() {
               className="flex items-start gap-3 cursor-pointer p-2 hover:bg-slate-50 rounded-lg select-none"
             >
               {checks.export_excel ? <CheckSquare className="h-5 w-5 text-indigo-600 mt-0.5 flex-shrink-0" /> : <Square className="h-5 w-5 text-slate-400 mt-0.5 flex-shrink-0" />}
-              <div>
-                <h3 className="text-sm font-bold text-slate-800">Excel Visual Data Export Check</h3>
+              <div>                <h3 className="text-sm font-bold text-slate-800">Excel Visual Data Export Check</h3>
                 <p className="text-xs text-slate-500">Extracts data from report visuals and checks row counts and exported column names.</p>
               </div>
             </div>
           </div>
         </div>
+
+        {/* Live Countdown Time during execution */}
+        {running && (
+          <div className="p-4 bg-indigo-50/70 border border-indigo-100 rounded-xl flex items-center justify-between text-xs font-semibold text-indigo-900">
+            <span className="flex items-center gap-2">
+              <Loader2 className="h-4 w-4 animate-spin text-indigo-600" />
+              <span>Auditing Power BI Service Report...</span>
+            </span>
+            <span className="flex items-center gap-1 bg-white px-2.5 py-1 rounded-full border border-indigo-200 text-indigo-700 font-mono text-xs">
+              <Clock className="h-3.5 w-3.5 text-indigo-500" />
+              {countdownSeconds > 0 ? `Est. ${formatTimer(countdownSeconds)} left` : 'Finalizing...'}
+            </span>
+          </div>
+        )}
 
         {/* Alerts and errors */}
         {error && (
@@ -403,7 +491,7 @@ export default function ServiceTest() {
         <div className="flex justify-end gap-3 pt-2">
           <button
             type="button"
-            onClick={() => navigate('/')}
+            onClick={() => navigate('/landing')}
             className="px-4 py-2 border border-slate-200 text-slate-700 text-xs font-semibold rounded-lg hover:bg-slate-100 transition-colors"
           >
             Back
@@ -412,12 +500,12 @@ export default function ServiceTest() {
             type="button"
             onClick={handleRunTests}
             disabled={running || !token}
-            className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg shadow-sm disabled:opacity-50 flex items-center gap-2 transition-colors"
+            className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg shadow-sm disabled:opacity-50 flex items-center gap-2 transition-colors cursor-pointer"
           >
             {running ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />
-                Auditing Power BI Service Report...
+                <span>Auditing Report ({countdownSeconds > 0 ? formatTimer(countdownSeconds) : 'Finalizing'})...</span>
               </>
             ) : (
               'Run Live QA Tests'

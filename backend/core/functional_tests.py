@@ -178,10 +178,13 @@ class PlaywrightFunctionalTester:
             }
         if not self.page_slicers:
             self.page_slicers = {
+                "Sales Overview": ["Region", "Segment"],
                 "Customer Overview": ["Slicer"],
                 "Sales Trends": ["Slicer"],
                 "Shipping and Order Details": ["Slicer"]
             }
+        elif "Sales Overview" not in self.page_slicers and any(p == "Sales Overview" for p in (pages or [])):
+            self.page_slicers["Sales Overview"] = ["Region", "Segment"]
             
         debug_data = {
             "bookmarks": [],

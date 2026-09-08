@@ -11,6 +11,21 @@ export default function JobStatus() {
   const [progress, setProgress] = useState(0);
   const [currentStep, setCurrentStep] = useState('Queued...');
   const [errorMsg, setErrorMsg] = useState(null);
+  const ESTIMATED_SECONDS = 30;
+  const [countdownSeconds, setCountdownSeconds] = useState(ESTIMATED_SECONDS);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCountdownSeconds((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const formatTimer = (seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}s`;
+  };
 
   useEffect(() => {
     let intervalId;
@@ -83,7 +98,15 @@ export default function JobStatus() {
           {status === 'complete' && 'Analysis Complete!'}
           {status === 'failed' && 'Job Execution Failed'}
         </h2>
-        <p className="text-xs font-mono text-slate-400 mb-6">ID: {jobId}</p>
+        
+        {/* Job ID & Centered Elapsed Timer Badge */}
+        <p className="text-xs font-mono text-slate-400 mb-3 truncate max-w-full text-center">ID: {jobId}</p>
+        
+        <div className="flex justify-center mb-6">
+          <span className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full text-xs font-mono font-bold bg-indigo-50 border border-indigo-200 text-indigo-700 shadow-xs">
+            ⏱️ {countdownSeconds > 0 ? `Est. Time Remaining: ${formatTimer(countdownSeconds)}` : 'Finalizing Analysis...'}
+          </span>
+        </div>
 
         {/* Progress Bar */}
         <div className="space-y-2 mb-6">

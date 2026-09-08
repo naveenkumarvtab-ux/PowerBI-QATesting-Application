@@ -18,8 +18,9 @@ def is_page_hidden(sec):
     return False
 
 class PBIXParser:
-    def __init__(self, file_path):
+    def __init__(self, file_path, expected_font=None):
         self.file_path = file_path
+        self.expected_font = expected_font.strip() if (expected_font and isinstance(expected_font, str)) else None
         self.m_queries = {}
         self.dax_measures = {}
         self.dax_columns = {}
@@ -158,7 +159,7 @@ class PBIXParser:
                 layout = json.loads(self.layout_str)
                 # 1. Font Consistency Check
                 try:
-                    font_violations = check_font_consistency(layout, self.theme_json)
+                    font_violations = check_font_consistency(layout, self.theme_json, expected_font=self.expected_font)
                     self.layout_violations.extend(font_violations)
                 except Exception as fe:
                     print(f"Font consistency check failed: {fe}")
@@ -835,42 +836,14 @@ def validate_visual_actions(layout_json):
     return violations
 
 
-def check_font_consistency(layout_json, theme_json=None):
-    """
-    Detects if text elements across pages deviate from the dominant theme/report font.
-    """
-    theme_fonts = []
-    if theme_json:
-        # Check textClasses
-        tc = theme_json.get("textClasses", {})
-        for item in tc.values():
-            if isinstance(item, dict):
-                f = item.get("fontFace") or item.get("fontFamily")
-                if f:
-                    theme_fonts.append(f)
-        # Check visualStyles recursively
-        def find_visual_styles_fonts(node):
-            res = []
-            if isinstance(node, dict):
-                for k, v in node.items():
-                    if k in ("fontFace", "fontFamily") and isinstance(v, str):
-                        res.append(v)
-                    else:
-                        res.extend(find_visual_styles_fonts(v))
-            elif isinstance(node, list):
-                for x in node:
-                    res.extend(find_visual_styles_fonts(x))
-            return res
-        theme_fonts.extend(find_visual_styles_fonts(theme_json.get("visualStyles", {})))
-        
-def check_font_consistency(layout_json, theme_fonts=None):
+def check_font_consistency(layout_json, theme_fonts=None, expected_font=None):
     """
     Checks role-to-role font consistency across all visual elements in the report.
+    If expected_font is provided, validates that all headers and values match expected_font.
+    Otherwise, checks relative uniformity against dominant theme/report font.
     Roles:
       - "header": visual title, column headers, axis titles
       - "value": data labels, card values, tick labels, legend labels, text runs
-    Evaluates whether all elements in a role are uniform (same font and size).
-    Does NOT assert any single "report standard".
     """
     from collections import Counter
     import re
@@ -878,7 +851,7 @@ def check_font_consistency(layout_json, theme_fonts=None):
     if not layout_json:
         return []
 
-    # Handle dictionary theme_fonts (compatibility with mock_theme)
+    # Handle dictionary theme_fonts (compatibility with mock_theme or theme_json)
     if isinstance(theme_fonts, dict):
         extracted_fonts = []
         def find_fonts_in_dict(node):
@@ -894,9 +867,9 @@ def check_font_consistency(layout_json, theme_fonts=None):
         find_fonts_in_dict(theme_fonts)
         theme_fonts = extracted_fonts
 
-    # Fallback default family
-    general_dominant_family = "Segoe UI"
-    if theme_fonts:
+    # Default family fallback
+    general_dominant_family = expected_font.strip() if (expected_font and isinstance(expected_font, str)) else "Segoe UI"
+    if not expected_font and theme_fonts:
         general_dominant_family = Counter(theme_fonts).most_common(1)[0][0]
 
     def extract_val(node):
@@ -1070,7 +1043,7 @@ def check_font_consistency(layout_json, theme_fonts=None):
     for (page_name, visual_title, vc_id), vis_elems in visuals_elements.items():
         role_issues = {}
         for role in ("header", "value"):
-            maj_f = role_fonts[role]
+            target_f = expected_font.strip() if expected_font else role_fonts[role]
             maj_s = role_sizes[role]
             
             # Check this visual's elements for this role
@@ -1079,36 +1052,54 @@ def check_font_consistency(layout_json, theme_fonts=None):
             for el in v_role_elems:
                 f = el["font_family"]
                 s = el["font_size"]
-                if f.lower() != maj_f.lower() or s != maj_s:
-                    found_str = f"{f} {s}"
-                    maj_str = f"{maj_f} {maj_s}"
-                    role_issues[role] = (found_str, maj_str)
-                    break
+                if expected_font:
+                    if f and f.lower() != target_f.lower():
+                        role_issues[role] = (f, target_f)
+                        break
+                else:
+                    if (f and f.lower() != target_f.lower()) or (s and s != maj_s):
+                        found_str = f"{f} {s}".strip()
+                        maj_str = f"{target_f} {maj_s}".strip()
+                        role_issues[role] = (found_str, maj_str)
+                        break
 
         if role_issues:
             has_mismatch = True
             h_issue = role_issues.get("header")
             v_issue = role_issues.get("value")
             
-            if h_issue and v_issue:
-                message = (f"Visual '{visual_title}' on page '{page_name}' has inconsistent fonts: "
-                           f"header uses '{h_issue[0]}' while most headers use '{h_issue[1]}'; "
-                           f"value uses '{v_issue[0]}' while most values use '{v_issue[1]}'.")
-            elif h_issue:
-                message = (f"Visual '{visual_title}' on page '{page_name}' uses '{h_issue[0]}' for its header "
-                           f"— most other headers in the report use '{h_issue[1]}'. Header fonts are not consistent across the report.")
-            elif v_issue:
-                message = (f"Visual '{visual_title}' on page '{page_name}' uses '{v_issue[0]}' for its value "
-                           f"— most other values in the report use '{v_issue[1]}'. Value fonts are not consistent across the report.")
+            if expected_font:
+                if h_issue and v_issue:
+                    message = (f"Visual '{visual_title}' on page '{page_name}' header font '{h_issue[0]}' "
+                               f"and value font '{v_issue[0]}' do not match expected font '{expected_font}'.")
+                elif h_issue:
+                    message = (f"Visual '{visual_title}' on page '{page_name}' uses header font '{h_issue[0]}', "
+                               f"which does not match expected font '{expected_font}'.")
+                elif v_issue:
+                    message = (f"Visual '{visual_title}' on page '{page_name}' uses value font '{v_issue[0]}', "
+                               f"which does not match expected font '{expected_font}'.")
+                else:
+                    message = f"Visual '{visual_title}' on page '{page_name}' has font mismatches with expected font '{expected_font}'."
             else:
-                message = f"Visual '{visual_title}' on page '{page_name}' has inconsistent fonts."
+                if h_issue and v_issue:
+                    message = (f"Visual '{visual_title}' on page '{page_name}' has inconsistent fonts: "
+                               f"header uses '{h_issue[0]}' while most headers use '{h_issue[1]}'; "
+                               f"value uses '{v_issue[0]}' while most values use '{v_issue[1]}'.")
+                elif h_issue:
+                    message = (f"Visual '{visual_title}' on page '{page_name}' uses '{h_issue[0]}' for its header "
+                               f"— most other headers in the report use '{h_issue[1]}'. Header fonts are not consistent across the report.")
+                elif v_issue:
+                    message = (f"Visual '{visual_title}' on page '{page_name}' uses '{v_issue[0]}' for its value "
+                               f"— most other values in the report use '{v_issue[1]}'. Value fonts are not consistent across the report.")
+                else:
+                    message = f"Visual '{visual_title}' on page '{page_name}' has inconsistent fonts."
 
             violations.append({
                 "category": "font_consistency",
                 "status": "warning",
                 "target": f"Font Consistency ({page_name} - {visual_title})",
                 "message": message,
-                "suggested_fix": "Update the flagged element(s) in the Format pane (or apply the report theme) to match the font and size used by other elements with the same role.",
+                "suggested_fix": f"Update the flagged element(s) in the Format pane to match the expected font '{expected_font}'." if expected_font else "Update the flagged element(s) in the Format pane (or apply the report theme) to match the font and size used by other elements with the same role.",
                 "page_name": page_name,
                 "visual_id": vc_id,
                 "visual_title": visual_title
@@ -1120,7 +1111,7 @@ def check_font_consistency(layout_json, theme_fonts=None):
             "category": "font_consistency",
             "status": "pass",
             "target": "Font Consistency (Report-wide)",
-            "message": "All headers use a consistent font and size, and all values use a consistent font and size, across the report.",
+            "message": f"All visual headers and values match expected font '{expected_font}' across the report." if expected_font else "All headers use a consistent font and size, and all values use a consistent font and size, across the report.",
             "suggested_fix": ""
         })
 

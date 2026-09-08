@@ -92,6 +92,14 @@ def test_font_consistency():
     assert "All headers use a consistent font and size, and all values use a consistent font and size, across the report." in passes[0]["message"]
     assert "standard" not in passes[0]["message"].lower()
 
+    # Scenario 3: Expected font matches
+    violations_expected_pass = check_font_consistency(mock_layout_clean, expected_font="Arial")
+    assert any(v["status"] == "pass" and "Arial" in v["message"] for v in violations_expected_pass)
+
+    # Scenario 4: Expected font mismatch (Layout has Arial, expected Segoe UI)
+    violations_expected_mismatch = check_font_consistency(mock_layout, expected_font="Segoe UI")
+    assert any(v["status"] == "warning" and "Segoe UI" in v["message"] for v in violations_expected_mismatch)
+
 
 def test_unused_measures():
     dax_measures = {

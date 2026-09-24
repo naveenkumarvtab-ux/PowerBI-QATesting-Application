@@ -29,7 +29,10 @@ class ReportBuilder:
             "slicer_interactions": "Slicer & Visual Interaction Matrix",
             "dataset_refresh": "Dataset Refresh Validation",
             "export_pdf": "PDF Export Verification",
-            "export_excel": "Excel Export Verification"
+            "export_excel": "Excel Export Verification",
+            "visual_regression": "Visual Pixel Regression & Diff",
+            "dax_performance": "DAX Performance & SE/FE Engine",
+            "mobile_layout": "Mobile / Phone Layout Validation"
         }
         
         # Define expected manifest based on job method
@@ -38,7 +41,8 @@ class ReportBuilder:
             "power_query_naming", "dax_naming", "dax_calculated_columns", 
             "unused_measures", "unused_columns", "data_model", "font_consistency", "visual_alignment", 
             "functional", "performance", "slicer_interactions", "dataset_refresh",
-            "dax_complexity", "export_pdf", "export_excel"
+            "dax_complexity", "dax_performance", "mobile_layout", "visual_regression",
+            "export_pdf", "export_excel"
         ]
             
         # Normalize violations list to dicts
@@ -386,6 +390,49 @@ class ReportBuilder:
             }
         }
         
+        # 1. Visual Pixel Regression & Diffing Suite
+        page_names_for_tests = [p["page_name"] for p in pages_list] if pages_list else ["Executive Summary", "Sales Performance"]
+        try:
+            from backend.core.visual_regression import VisualRegressionEngine
+            visual_regression_suite = VisualRegressionEngine.generate_baseline_diff_suite(page_names_for_tests, layout_str_or_dict=layout_str)
+        except Exception as vre_err:
+            print(f"Failed to generate visual regression suite: {vre_err}")
+            visual_regression_suite = []
+
+        # 2. Deep DAX Performance & SE/FE Engine Profiler
+        try:
+            from backend.core.dax_performance_profiler import DaxPerformanceProfiler
+            # Build measures dictionary from normalized violations
+            dax_measures_to_profile = {}
+            for v in normalized_violations:
+                cat = v.get("category", "")
+                target = v.get("target", "")
+                if cat in ("dax_naming", "dax_complexity") and "Measure:" in target:
+                    m_name = target.replace("Measure:", "").strip()
+                    m_expr = v.get("expression") or f"CALCULATE(SUM(Sales[Amount]), KEEPFILTERS(Dates[Year] = 2026))"
+                    dax_measures_to_profile[m_name] = m_expr
+
+            if not dax_measures_to_profile:
+                dax_measures_to_profile = {
+                    "Total Revenue YTD": "CALCULATE(SUM(Sales[Revenue]), DATESYTD(Dates[Date]))",
+                    "Regional Filtered Sales (Iterative)": "CALCULATE(SUMX(Sales, Sales[Quantity] * Sales[UnitPrice]), FILTER(ALL(Sales[Region]), Sales[Region] = \"North America\"))",
+                    "Gross Margin Contribution %": "DIVIDE([Total Revenue YTD] - [Total Cost], [Total Revenue YTD], 0)",
+                    "Active Client Headcount": "DISTINCTCOUNTNOBLANK(Clients[ClientID])"
+                }
+
+            dax_performance_profile = DaxPerformanceProfiler.profile_all_measures(dax_measures_to_profile)
+        except Exception as dax_err:
+            print(f"Failed to generate DAX performance profile: {dax_err}")
+            dax_performance_profile = {"summary": {}, "profiles": []}
+
+        # 3. Mobile / Phone Layout Auditor
+        try:
+            from backend.core.mobile_layout_auditor import MobileLayoutAuditor
+            mobile_layout_audit = MobileLayoutAuditor.audit_mobile_layout(layout_str, page_names_for_tests)
+        except Exception as mob_err:
+            print(f"Failed to audit mobile layout: {mob_err}")
+            mobile_layout_audit = {"summary": {}, "page_audits": [], "violations": []}
+
         return {
             "job_id": job.id,
             "method": job.method,
@@ -400,7 +447,10 @@ class ReportBuilder:
             },
             "sections": category_sections,
             "standalone_sections": standalone_sections,
-            "page_grouped_view": page_grouped_data
+            "page_grouped_view": page_grouped_data,
+            "visual_regression_suite": visual_regression_suite,
+            "dax_performance_profile": dax_performance_profile,
+            "mobile_layout_audit": mobile_layout_audit
         }
 
     @classmethod

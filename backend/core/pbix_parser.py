@@ -481,6 +481,7 @@ class PBIXParser:
             
             visual_containers = []
             prefix = f"Report/definition/pages/{page_id}/visuals/"
+            page_has_mobile = False
             for name in names:
                 if name.startswith(prefix) and name.endswith("visual.json"):
                     try:
@@ -489,19 +490,37 @@ class PBIXParser:
                         position = vis_data.get("position", {})
                         visual = vis_data.get("visual", {})
                         
+                        # Check for Fabric PBIR mobile layout definition
+                        mobile_name = name.replace("visual.json", "mobile.json")
+                        has_mobile_placement = False
+                        mobile_position = None
+                        if mobile_name in names:
+                            try:
+                                mobile_data = json.loads(z.read(mobile_name).decode("utf-8-sig"))
+                                mobile_position = mobile_data.get("position", {})
+                                has_mobile_placement = True
+                                page_has_mobile = True
+                            except Exception as me:
+                                print(f"Failed to parse mobile.json {mobile_name}: {me}")
+                        
                         vc_objects = {}
                         if "visualContainerObjects" in visual:
                             vc_objects = visual.get("visualContainerObjects") or {}
                         elif "objects" in visual:
                             vc_objects = visual.get("objects") or {}
                             
+                        sv_dict = {
+                            "visualType": visual.get("visualType"),
+                            "projections": visual.get("query", {}).get("queryState", {}),
+                            "objects": visual.get("objects", {}),
+                            "vcObjects": vc_objects
+                        }
+                        if has_mobile_placement:
+                            sv_dict["isMobilePlaced"] = True
+                            sv_dict["mobilePosition"] = mobile_position
+                            
                         config_dict = {
-                            "singleVisual": {
-                                "visualType": visual.get("visualType"),
-                                "projections": visual.get("query", {}).get("queryState", {}),
-                                "objects": visual.get("objects", {}),
-                                "vcObjects": vc_objects
-                            }
+                            "singleVisual": sv_dict
                         }
                         
                         vc = {
@@ -511,19 +530,30 @@ class PBIXParser:
                             "width": position.get("width"),
                             "height": position.get("height"),
                             "z": position.get("z"),
+                            "isMobilePlaced": has_mobile_placement,
+                            "mobileState": has_mobile_placement,
+                            "mobilePosition": mobile_position if has_mobile_placement else None,
                             "config": json.dumps(config_dict)
                         }
                         visual_containers.append(vc)
                     except Exception as ve:
                         print(f"Failed to parse visual {name}: {ve}")
                         
+            page_config = page_data.get("objects", {}) or {}
+            if page_has_mobile:
+                if isinstance(page_config, dict):
+                    page_config["hasMobileLayout"] = True
+                    page_config["mobileState"] = True
+            
             sections.append({
                 "name": page_id,
                 "displayName": page_name,
                 "visibility": visibility,
+                "hasMobileLayout": page_has_mobile,
+                "mobileState": page_has_mobile,
                 "visualContainers": visual_containers,
                 "filters": json.dumps(page_data.get("filters", [])) if "filters" in page_data else None,
-                "config": json.dumps(page_data.get("objects", {}))
+                "config": json.dumps(page_config)
             })
             
         layout_dict = {

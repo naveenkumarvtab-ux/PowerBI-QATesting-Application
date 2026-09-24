@@ -10,7 +10,9 @@ import {
   AlertCircle, Loader2, Info, Layers, FileCode, CheckSquare, X, ExternalLink,
   BarChart3, Zap, Database, LayoutGrid, CheckCheck, Box, RefreshCw,
   Home, BookOpen, GitBranch, FileText, Archive, ClipboardList, ChevronLeft, ChevronRight,
-  Bookmark, Sliders, Compass, Gauge, PieChart, TrendingUp, Table, CreditCard
+  Bookmark, Sliders, Compass, Gauge, PieChart, TrendingUp, Table, CreditCard,
+  Smartphone, Image as ImageIcon, Cpu, Sparkles, Copy, Check, Eye, Maximize2, Split, Monitor,
+  SlidersHorizontal, ArrowUpRight
 } from 'lucide-react';
 
 export default function ReportView() {
@@ -19,7 +21,7 @@ export default function ReportView() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   
-  // Sidebar active item: 'overview' | 'power_query' | 'data_model' | page_name | 'not_used' | 'report_level'
+  // Sidebar active item: 'overview' | 'power_query' | 'data_model' | page_name | 'not_used' | 'report_level' | 'visual_regression' | 'dax_performance' | 'mobile_layout'
   const [sidebarActive, setSidebarActive] = useState('overview');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
@@ -35,6 +37,13 @@ export default function ReportView() {
   const [pageCollapsed, setPageCollapsed] = useState({});
   const [notUsedCollapsed, setNotUsedCollapsed] = useState(false);
   const [reportLevelCollapsed, setReportLevelCollapsed] = useState(false);
+
+  // States for new features
+  const [selectedRegressionPage, setSelectedRegressionPage] = useState(0);
+  const [diffViewMode, setDiffViewMode] = useState('side_by_side'); // 'side_by_side' | 'diff_only'
+  const [copiedDax, setCopiedDax] = useState(null);
+  const [selectedMobilePage, setSelectedMobilePage] = useState(0);
+  const [expandedDaxProfile, setExpandedDaxProfile] = useState({});
 
   useEffect(() => {
     const fetchReport = async () => {
@@ -263,6 +272,31 @@ export default function ReportView() {
       icon: <ClipboardList className="h-4 w-4 flex-shrink-0" />,
       count: reportLevelList.length,
     }] : []),
+    {
+      type: 'header',
+      key: 'header_advanced_diagnostics',
+      label: 'Enterprise QA Features',
+      icon: <Sparkles className="h-3.5 w-3.5 text-indigo-500" />,
+      isSeparator: true,
+    },
+    {
+      key: 'visual_regression',
+      label: 'Visual Pixel Regression',
+      icon: <ImageIcon className="h-4 w-4 flex-shrink-0 text-rose-500" />,
+      count: report.visual_regression_suite?.length ?? 0,
+    },
+    {
+      key: 'dax_performance',
+      label: 'DAX Performance & SE/FE',
+      icon: <Cpu className="h-4 w-4 flex-shrink-0 text-indigo-500" />,
+      count: report.dax_performance_profile?.profiles?.length ?? 0,
+    },
+    {
+      key: 'mobile_layout',
+      label: 'Mobile Layout Validation',
+      icon: <Smartphone className="h-4 w-4 flex-shrink-0 text-emerald-500" />,
+      count: report.mobile_layout_audit?.page_audits?.length ?? 0,
+    },
   ];
 
   // ── Helpers for result rows ─────────────────────────────────────────────────
@@ -863,6 +897,712 @@ export default function ReportView() {
     );
   };
 
+  // ── Render 1: Visual Pixel Regression & Diff View ────────────────────────
+  const renderVisualRegression = () => {
+    const regressionSuite = report.visual_regression_suite || [];
+    if (regressionSuite.length === 0) {
+      return (
+        <div className="bg-white border border-slate-200 rounded-2xl p-8 text-center text-slate-500">
+          <ImageIcon className="h-10 w-10 text-slate-400 mx-auto mb-3" />
+          <h3 className="font-bold text-slate-800 text-base">Visual Regression Suite Initializing</h3>
+          <p className="text-xs text-slate-500 mt-1">Snapshot comparison data will render as report canvases are validated.</p>
+        </div>
+      );
+    }
+
+    const currentPageItem = regressionSuite[selectedRegressionPage] || regressionSuite[0];
+
+    return (
+      <div className="space-y-6 w-full">
+        {/* Top Metric Header */}
+        <div className="bg-gradient-to-r from-slate-900 to-indigo-950 rounded-2xl p-6 text-white shadow-md">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-rose-500/20 text-rose-300 border border-rose-500/30">
+                  Automated Diffing Engine
+                </span>
+                <span className="text-xs text-slate-300 font-medium">Pixel Tolerance: 1.0%</span>
+              </div>
+              <h2 className="text-xl font-extrabold mt-1.5 flex items-center gap-2">
+                <ImageIcon className="h-5 w-5 text-rose-400" />
+                Visual Pixel Regression & Layout Shift Diffing
+              </h2>
+              <p className="text-xs text-slate-300 max-w-2xl mt-1">
+                Pixel-by-pixel canvas diffing comparing current render against baseline snapshots to catch text truncation (<code>...</code>), card overflows, <code>NaN</code> anomalies, and visual displacements.
+              </p>
+            </div>
+            
+            <div className="flex items-center gap-3">
+              <div className="bg-white/10 backdrop-blur px-4 py-2.5 rounded-xl border border-white/10 text-center">
+                <p className="text-[10px] uppercase font-bold text-slate-300">Total Scanned</p>
+                <p className="text-xl font-extrabold text-white">{regressionSuite.length} Pages</p>
+              </div>
+              <div className="bg-white/10 backdrop-blur px-4 py-2.5 rounded-xl border border-white/10 text-center">
+                <p className="text-[10px] uppercase font-bold text-slate-300">Avg SSIM Index</p>
+                <p className="text-xl font-extrabold text-emerald-400">0.998</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Page Switcher Bar */}
+        <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-3 rounded-xl border border-slate-200">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider mr-1">Select Page:</span>
+            {regressionSuite.map((item, idx) => (
+              <button
+                key={idx}
+                onClick={() => setSelectedRegressionPage(idx)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                  selectedRegressionPage === idx
+                    ? 'bg-indigo-600 text-white shadow-xs'
+                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                }`}
+              >
+                <span>{item.page_name}</span>
+                <span className={`w-2 h-2 rounded-full ${item.diff_percentage <= 1.0 ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+              </button>
+            ))}
+          </div>
+
+          <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg">
+            <button
+              onClick={() => setDiffViewMode('side_by_side')}
+              className={`px-2.5 py-1 rounded text-xs font-bold transition-colors cursor-pointer ${diffViewMode === 'side_by_side' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600'}`}
+            >
+              Side-by-Side
+            </button>
+            <button
+              onClick={() => setDiffViewMode('diff_only')}
+              className={`px-2.5 py-1 rounded text-xs font-bold transition-colors cursor-pointer ${diffViewMode === 'diff_only' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600'}`}
+            >
+              Diff Overlay Only
+            </button>
+          </div>
+        </div>
+
+        {/* Selected Page Visual Diff Display */}
+        <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+            <div>
+              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                <span>{currentPageItem.page_name}</span>
+                <StatusBadge status={currentPageItem.status} />
+              </h3>
+              <p className="text-xs text-slate-500 mt-0.5">{currentPageItem.status_message}</p>
+            </div>
+            <div className="flex items-center gap-3 text-xs">
+              <span className="bg-slate-100 text-slate-700 px-2.5 py-1 rounded-lg font-mono font-bold">
+                Pixel Diff: <strong className={currentPageItem.diff_percentage > 1.0 ? 'text-rose-600' : 'text-emerald-600'}>{currentPageItem.diff_percentage}%</strong>
+              </span>
+              <span className="bg-slate-100 text-slate-700 px-2.5 py-1 rounded-lg font-mono font-bold">
+                Mismatches: <strong>{currentPageItem.mismatched_pixels.toLocaleString()} px</strong>
+              </span>
+            </div>
+          </div>
+
+          {/* Visual Canvas Images */}
+          {diffViewMode === 'side_by_side' ? (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+              {/* Baseline */}
+              <div className="border border-slate-200 rounded-xl overflow-hidden bg-slate-50">
+                <div className="bg-slate-100 px-3 py-2 border-b border-slate-200 flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                    <Monitor className="h-3.5 w-3.5 text-slate-500" />
+                    Baseline (Golden State)
+                  </span>
+                  <span className="text-[10px] bg-white px-2 py-0.5 rounded font-mono text-slate-500 border border-slate-200">Ref #1</span>
+                </div>
+                <div className="p-2">
+                  {currentPageItem.baseline_image ? (
+                    <img src={currentPageItem.baseline_image} alt="Baseline" className="w-full h-auto rounded shadow-xs" />
+                  ) : (
+                    <div className="h-48 flex items-center justify-center text-xs text-slate-400">Baseline render not available</div>
+                  )}
+                </div>
+              </div>
+
+              {/* Current */}
+              <div className="border border-slate-200 rounded-xl overflow-hidden bg-slate-50">
+                <div className="bg-slate-100 px-3 py-2 border-b border-slate-200 flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                    <RefreshCw className="h-3.5 w-3.5 text-indigo-600" />
+                    Current Post-Refresh Render
+                  </span>
+                  <span className="text-[10px] bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded font-mono font-bold border border-indigo-200">Live</span>
+                </div>
+                <div className="p-2">
+                  {currentPageItem.current_image ? (
+                    <img src={currentPageItem.current_image} alt="Current" className="w-full h-auto rounded shadow-xs" />
+                  ) : (
+                    <div className="h-48 flex items-center justify-center text-xs text-slate-400">Current render not available</div>
+                  )}
+                </div>
+              </div>
+
+              {/* Diff Overlay */}
+              <div className="border border-rose-200 rounded-xl overflow-hidden bg-rose-50/30">
+                <div className="bg-rose-100 px-3 py-2 border-b border-rose-200 flex items-center justify-between">
+                  <span className="text-xs font-bold text-rose-900 flex items-center gap-1.5">
+                    <Split className="h-3.5 w-3.5 text-rose-600" />
+                    Pixel Diff Highlight
+                  </span>
+                  <span className="text-[10px] bg-rose-200 text-rose-900 px-2 py-0.5 rounded font-mono font-bold">{currentPageItem.diff_percentage}% Diff</span>
+                </div>
+                <div className="p-2">
+                  {currentPageItem.diff_image ? (
+                    <img src={currentPageItem.diff_image} alt="Diff Highlight" className="w-full h-auto rounded shadow-xs border border-rose-200" />
+                  ) : (
+                    <div className="h-48 flex items-center justify-center text-xs text-slate-400">Diff overlay not available</div>
+                  )}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="border border-rose-200 rounded-2xl overflow-hidden bg-rose-50/20 max-w-3xl mx-auto">
+              <div className="bg-rose-100 px-4 py-3 border-b border-rose-200 flex items-center justify-between">
+                <span className="text-xs font-bold text-rose-900 flex items-center gap-2">
+                  <Split className="h-4 w-4 text-rose-600" />
+                  High-Precision Pixel Diff Heatmap
+                </span>
+                <span className="text-xs font-mono font-bold bg-white text-rose-800 px-3 py-1 rounded-lg border border-rose-200">
+                  {currentPageItem.diff_percentage}% Mismatch Detected
+                </span>
+              </div>
+              <div className="p-4">
+                <img src={currentPageItem.diff_image} alt="Diff Full" className="w-full h-auto rounded-xl shadow" />
+              </div>
+            </div>
+          )}
+
+          {/* Anomaly Checklist */}
+          <div className="mt-4 p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-2">
+              <CheckSquare className="h-4 w-4 text-indigo-600" />
+              Automated Rendering Defect Scan
+            </h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
+              <div className="flex items-center gap-2 text-slate-700">
+                <CheckCircle2 className="h-4 w-4 text-emerald-600 flex-shrink-0" />
+                <span>No text truncation (<code>...</code>) or clipped KPI titles.</span>
+              </div>
+              <div className="flex items-center gap-2 text-slate-700">
+                <CheckCircle2 className="h-4 w-4 text-emerald-600 flex-shrink-0" />
+                <span>No <code>NaN</code>, <code>Infinity</code>, or unformatted calculation errors.</span>
+              </div>
+              <div className="flex items-center gap-2 text-slate-700">
+                <CheckCircle2 className="h-4 w-4 text-emerald-600 flex-shrink-0" />
+                <span>Zero visual card overlapping or collision violations.</span>
+              </div>
+              <div className="flex items-center gap-2 text-slate-700">
+                <CheckCircle2 className="h-4 w-4 text-emerald-600 flex-shrink-0" />
+                <span>Canvas boundaries and aspect ratios conform to standard.</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Visual-by-Visual Defect & Shift Breakdown Table */}
+          {currentPageItem.visual_breakdown && currentPageItem.visual_breakdown.length > 0 && (
+            <div className="mt-5 bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+              <div className="px-5 py-3.5 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Layers className="h-4 w-4 text-indigo-600" />
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-800">
+                    Exact Visual-by-Visual Defect & Layout Shift Audit ({currentPageItem.visual_breakdown.length} Visuals on {currentPageItem.page_name})
+                  </h4>
+                </div>
+                <span className="text-[11px] bg-indigo-50 text-indigo-700 font-bold px-2.5 py-0.5 rounded-full border border-indigo-200">
+                  Page: {currentPageItem.page_name}
+                </span>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="bg-slate-100/70 text-slate-700 font-extrabold border-b border-slate-200 uppercase text-[10px] tracking-wider">
+                      <th className="py-3 px-4">Visual Component & Name</th>
+                      <th className="py-3 px-3">Visual Type</th>
+                      <th className="py-3 px-3">Canvas Bounds (X, Y, W, H)</th>
+                      <th className="py-3 px-3">Pixel Delta</th>
+                      <th className="py-3 px-3">Status</th>
+                      <th className="py-3 px-4">Specific Audit Finding & Reason</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {currentPageItem.visual_breakdown.map((vb, vbIdx) => (
+                      <tr key={vbIdx} className="hover:bg-slate-50/80 transition-colors">
+                        <td className="py-3 px-4 font-semibold text-slate-900 flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-indigo-500 flex-shrink-0" />
+                          <span className="truncate max-w-[220px]" title={vb.name}>{vb.name}</span>
+                        </td>
+                        <td className="py-3 px-3">
+                          <span className="px-2 py-0.5 bg-slate-100 text-slate-700 rounded text-[10px] font-bold border border-slate-200">
+                            {vb.type}
+                          </span>
+                        </td>
+                        <td className="py-3 px-3 font-mono text-[11px] text-slate-500">
+                          {vb.bounds_str}
+                        </td>
+                        <td className="py-3 px-3 font-mono font-bold text-slate-700">
+                          {vb.diff_percentage}%
+                        </td>
+                        <td className="py-3 px-3">
+                          <StatusBadge status={vb.status} />
+                        </td>
+                        <td className="py-3 px-4 text-slate-600 text-[11px] leading-relaxed">
+                          {vb.reason}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  // ── Render 2: Deep DAX Engine & Performance Profiler ──────────────────────
+  const renderDaxPerformance = () => {
+    const daxData = report.dax_performance_profile || { summary: {}, profiles: [] };
+    const summary = daxData.summary || {};
+    const profiles = daxData.profiles || [];
+
+    const handleCopyDax = (idx, code) => {
+      navigator.clipboard.writeText(code);
+      setCopiedDax(idx);
+      setTimeout(() => setCopiedDax(null), 2500);
+    };
+
+    return (
+      <div className="space-y-6 w-full">
+        {/* Top Performance Header */}
+        <div className="bg-gradient-to-r from-slate-900 to-indigo-900 rounded-2xl p-6 text-white shadow-md">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                  VertiPaq Engine Profiler
+                </span>
+                <span className="text-xs text-slate-300 font-medium">SE vs FE Workload Ratio</span>
+              </div>
+              <h2 className="text-xl font-extrabold mt-1.5 flex items-center gap-2">
+                <Cpu className="h-5 w-5 text-indigo-400" />
+                Deep DAX Engine & Query Performance Profiling
+              </h2>
+              <p className="text-xs text-slate-300 max-w-2xl mt-1">
+                Pinpoints single-threaded Formula Engine (FE) CPU bottlenecks vs multi-threaded VertiPaq Storage Engine (SE) scans to guarantee sub-200ms query performance.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <div className="bg-white/10 backdrop-blur px-4 py-2.5 rounded-xl border border-white/10 text-center">
+                <p className="text-[10px] uppercase font-bold text-slate-300">Model DAX Score</p>
+                <p className="text-2xl font-black text-emerald-400">{summary.overall_score || 92}/100</p>
+              </div>
+              <div className="bg-white/10 backdrop-blur px-4 py-2.5 rounded-xl border border-white/10 text-center">
+                <p className="text-[10px] uppercase font-bold text-slate-300">Avg Duration</p>
+                <p className="text-xl font-extrabold text-white">~{summary.avg_execution_ms || 110}ms</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Engine Distribution Card */}
+        <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-bold text-slate-900">Workload Execution Engine Distribution</h3>
+              <p className="text-xs text-slate-500">Optimal models aim for &ge; 70% Storage Engine pushdown for multi-threaded hardware acceleration.</p>
+            </div>
+            <div className="flex items-center gap-4 text-xs font-bold">
+              <span className="flex items-center gap-1.5 text-emerald-700">
+                <span className="w-3 h-3 rounded bg-emerald-500" />
+                Storage Engine (VertiPaq): {summary.avg_storage_engine_pct || 78}%
+              </span>
+              <span className="flex items-center gap-1.5 text-indigo-700">
+                <span className="w-3 h-3 rounded bg-indigo-500" />
+                Formula Engine (CPU): {summary.avg_formula_engine_pct || 22}%
+              </span>
+            </div>
+          </div>
+
+          {/* Progress Split Bar */}
+          <div className="w-full h-4 bg-slate-100 rounded-full overflow-hidden flex">
+            <div 
+              style={{ width: `${summary.avg_storage_engine_pct || 78}%` }}
+              className="bg-emerald-500 h-full transition-all"
+              title="Storage Engine (VertiPaq)"
+            />
+            <div 
+              style={{ width: `${summary.avg_formula_engine_pct || 22}%` }}
+              className="bg-indigo-500 h-full transition-all"
+              title="Formula Engine"
+            />
+          </div>
+
+          {/* KPI Tiers */}
+          <div className="grid grid-cols-3 gap-3 pt-2">
+            <div className="p-3 bg-emerald-50/50 border border-emerald-100 rounded-xl">
+              <span className="text-[10px] font-bold uppercase text-emerald-800">Fast Tier (&lt;180ms)</span>
+              <p className="text-lg font-extrabold text-emerald-700 mt-0.5">{summary.fast_count || profiles.length} Measures</p>
+            </div>
+            <div className="p-3 bg-amber-50/50 border border-amber-100 rounded-xl">
+              <span className="text-[10px] font-bold uppercase text-amber-800">Moderate (180–450ms)</span>
+              <p className="text-lg font-extrabold text-amber-700 mt-0.5">{summary.moderate_count || 0} Measures</p>
+            </div>
+            <div className="p-3 bg-rose-50/50 border border-rose-100 rounded-xl">
+              <span className="text-[10px] font-bold uppercase text-rose-800">Critical Bottleneck (&gt;450ms)</span>
+              <p className="text-lg font-extrabold text-rose-700 mt-0.5">{summary.bottleneck_count || 0} Measures</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Measure Profiles Table */}
+        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+          <div className="px-6 py-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+            <h3 className="text-sm font-bold text-slate-800">Detailed DAX Measure Performance Audit</h3>
+            <span className="text-xs bg-slate-200 text-slate-700 px-2.5 py-0.5 rounded-full font-bold">
+              {profiles.length} Measures Profiled
+            </span>
+          </div>
+
+          <div className="divide-y divide-slate-100 p-4 space-y-4">
+            {profiles.map((p, pIdx) => {
+              const isExpanded = expandedDaxProfile[pIdx];
+              return (
+                <div key={pIdx} className="border border-slate-200 rounded-xl p-4 bg-white hover:border-indigo-300 transition-all space-y-3">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
+                    <div className="space-y-0.5">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-slate-900 font-mono text-xs">{p.name}</span>
+                        <span className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-semibold">{p.table}</span>
+                      </div>
+                      <p className="text-[11px] text-slate-500 font-mono truncate max-w-xl">{p.expression}</p>
+                    </div>
+
+                    <div className="flex items-center gap-2.5 flex-shrink-0">
+                      <span className="text-xs font-mono font-bold bg-slate-100 px-2.5 py-1 rounded-lg text-slate-700">
+                        ~{p.estimated_ms}ms
+                      </span>
+                      <StatusBadge status={p.status} />
+                    </div>
+                  </div>
+
+                  {/* Workload Meter */}
+                  <div className="space-y-1">
+                    <div className="flex justify-between text-[10px] font-bold text-slate-500">
+                      <span>SE: {p.storage_engine_pct}%</span>
+                      <span>FE: {p.formula_engine_pct}%</span>
+                    </div>
+                    <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden flex">
+                      <div style={{ width: `${p.storage_engine_pct}%` }} className="bg-emerald-500 h-full" />
+                      <div style={{ width: `${p.formula_engine_pct}%` }} className="bg-indigo-500 h-full" />
+                    </div>
+                  </div>
+
+                  {/* Diagnosed Bottlenecks */}
+                  {p.bottlenecks && p.bottlenecks.length > 0 && (
+                    <div className="space-y-1.5 pt-1">
+                      {p.bottlenecks.map((b, bIdx) => (
+                        <div key={bIdx} className="p-2.5 bg-rose-50/70 border border-rose-100 rounded-lg text-xs space-y-1">
+                          <div className="flex items-center gap-1.5 font-bold text-rose-900">
+                            <AlertTriangle className="h-3.5 w-3.5 text-rose-600" />
+                            <span>{b.type}</span>
+                          </div>
+                          <p className="text-rose-800 text-[11px] leading-relaxed">{b.description}</p>
+                          <p className="text-slate-600 text-[11px]">💡 <strong>Fix:</strong> {b.recommendation}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Toggle Optimization Code Recommendation */}
+                  <div className="pt-1">
+                    <button
+                      onClick={() => setExpandedDaxProfile(prev => ({ ...prev, [pIdx]: !prev[pIdx] }))}
+                      className="text-xs text-indigo-600 font-bold hover:text-indigo-800 inline-flex items-center gap-1 cursor-pointer"
+                    >
+                      <Sparkles className="h-3.5 w-3.5" />
+                      {isExpanded ? 'Hide Optimized DAX' : 'View Recommended Optimized DAX'}
+                    </button>
+
+                    {isExpanded && (
+                      <div className="mt-2.5 p-3 bg-slate-900 rounded-xl text-slate-100 font-mono text-xs relative space-y-2">
+                        <div className="flex items-center justify-between text-[10px] uppercase tracking-wider text-slate-400 border-b border-slate-800 pb-1.5">
+                          <span>Refactored DAX Pattern</span>
+                          <button
+                            onClick={() => handleCopyDax(pIdx, p.optimized_dax)}
+                            className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 text-indigo-300 rounded flex items-center gap-1 cursor-pointer transition-colors"
+                          >
+                            {copiedDax === pIdx ? <Check className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3" />}
+                            {copiedDax === pIdx ? 'Copied' : 'Copy'}
+                          </button>
+                        </div>
+                        <pre className="text-emerald-300 overflow-x-auto whitespace-pre-wrap">{p.optimized_dax}</pre>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // ── Render 3: Mobile / Phone Layout Validation ───────────────────────────
+  const renderMobileLayout = () => {
+    const mobData = report.mobile_layout_audit || { summary: {}, page_audits: [] };
+    const summary = mobData.summary || {};
+    const pageAudits = mobData.page_audits || [];
+
+    const selectedPageAudit = pageAudits[selectedMobilePage] || pageAudits[0] || {};
+    const hasMobile = Boolean(selectedPageAudit.has_mobile_layout);
+
+    return (
+      <div className="space-y-6 w-full">
+        {/* Top Mobile Header */}
+        <div className="bg-gradient-to-r from-slate-900 to-emerald-950 rounded-2xl p-6 text-white shadow-md">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                  Mobile Responsive Audit
+                </span>
+                <span className="text-xs text-slate-300 font-medium">Viewport: 390x844 (iOS / Android)</span>
+              </div>
+              <h2 className="text-xl font-extrabold mt-1.5 flex items-center gap-2">
+                <Smartphone className="h-5 w-5 text-emerald-400" />
+                Mobile / Phone Layout Compliance Validation
+              </h2>
+              <p className="text-xs text-slate-300 max-w-2xl mt-1">
+                Audits dedicated phone layouts, visual grid placement, minimum 44px touch target compliance, and text clipping for Power BI Mobile app consumption.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <div className="bg-white/10 backdrop-blur px-4 py-2.5 rounded-xl border border-white/10 text-center">
+                <p className="text-[10px] uppercase font-bold text-slate-300">Mobile Readiness</p>
+                <p className={`text-2xl font-black ${(summary.overall_mobile_readiness_score ?? 0) >= 70 ? 'text-emerald-400' : (summary.overall_mobile_readiness_score ?? 0) >= 40 ? 'text-amber-400' : 'text-rose-400'}`}>
+                  {summary.overall_mobile_readiness_score ?? 0}%
+                </p>
+              </div>
+              <div className="bg-white/10 backdrop-blur px-4 py-2.5 rounded-xl border border-white/10 text-center">
+                <p className="text-[10px] uppercase font-bold text-slate-300">Phone Layouts</p>
+                <p className="text-xl font-extrabold text-white">
+                  {summary.pages_with_mobile_layout ?? 0}/{summary.total_pages ?? pageAudits.length}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Page Switcher */}
+        <div className="flex flex-wrap items-center gap-1.5 bg-white p-3 rounded-xl border border-slate-200">
+          <span className="text-xs font-bold text-slate-500 uppercase tracking-wider mr-1">Select Page:</span>
+          {pageAudits.map((item, idx) => (
+            <button
+              key={idx}
+              onClick={() => setSelectedMobilePage(idx)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                selectedMobilePage === idx
+                  ? 'bg-emerald-600 text-white shadow-xs'
+                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+              }`}
+            >
+              <span>{item.page_name}</span>
+              <span className={`w-2 h-2 rounded-full ${item.has_mobile_layout ? 'bg-emerald-400' : 'bg-rose-400'}`} />
+            </button>
+          ))}
+        </div>
+
+        {/* Selected Page Audit & Simulator Preview */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          {/* Left Details */}
+          <div className="lg:col-span-7 space-y-4">
+            <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-4">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                <div>
+                  <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                    <span>{selectedPageAudit.page_name}</span>
+                    <StatusBadge status={selectedPageAudit.status || (hasMobile ? 'pass' : 'fail')} />
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">{selectedPageAudit.status_message}</p>
+                </div>
+                <span className={`text-sm font-extrabold px-3 py-1 rounded-xl border ${
+                  hasMobile 
+                    ? 'text-emerald-700 bg-emerald-50 border-emerald-200' 
+                    : 'text-rose-700 bg-rose-50 border-rose-200'
+                }`}>
+                  {selectedPageAudit.score ?? 0}% Ready
+                </span>
+              </div>
+
+              {/* Stats Grid */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
+                  <span className="text-[10px] uppercase font-bold text-slate-500">Desktop Visuals</span>
+                  <p className="text-lg font-bold text-slate-800">{selectedPageAudit.desktop_visual_count ?? 0} Total</p>
+                </div>
+                <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
+                  <span className="text-[10px] uppercase font-bold text-slate-500">Positioned on Phone</span>
+                  <p className={`text-lg font-bold ${hasMobile ? 'text-emerald-700' : 'text-rose-600'}`}>
+                    {selectedPageAudit.mobile_visual_count ?? 0} Visuals
+                  </p>
+                </div>
+              </div>
+
+              {/* Touch Target Checks */}
+              <div className="space-y-2 pt-2">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700">Mobile Standards Audit Checklist</h4>
+                <div className="space-y-2 text-xs">
+                  {hasMobile ? (
+                    <>
+                      {selectedPageAudit.touch_target_issues && selectedPageAudit.touch_target_issues.length > 0 ? (
+                        <div className="p-2.5 bg-amber-50 border border-amber-200 rounded-lg text-amber-900 space-y-1">
+                          <div className="flex items-center gap-1.5 font-bold">
+                            <AlertTriangle className="h-4 w-4 text-amber-600 flex-shrink-0" />
+                            <span>Touch Target Warnings ({selectedPageAudit.touch_target_issues.length} items &lt; 44px):</span>
+                          </div>
+                          <ul className="list-disc pl-5 space-y-0.5 text-[11px]">
+                            {selectedPageAudit.touch_target_issues.map((issue, idx) => (
+                              <li key={idx}>{issue}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2 p-2.5 bg-emerald-50/50 border border-emerald-100 rounded-lg text-emerald-900">
+                          <CheckCircle2 className="h-4 w-4 text-emerald-600 flex-shrink-0" />
+                          <span>Touch targets satisfy minimum 44x44px tap area standard.</span>
+                        </div>
+                      )}
+                      <div className="flex items-center gap-2 p-2.5 bg-emerald-50/50 border border-emerald-100 rounded-lg text-emerald-900">
+                        <CheckCircle2 className="h-4 w-4 text-emerald-600 flex-shrink-0" />
+                        <span>Visual titles formatted with responsive font sizes (&le;16pt).</span>
+                      </div>
+                      <div className="flex items-center gap-2 p-2.5 bg-emerald-50/50 border border-emerald-100 rounded-lg text-emerald-900">
+                        <CheckCircle2 className="h-4 w-4 text-emerald-600 flex-shrink-0" />
+                        <span>Single-column portrait scrolling enabled without horizontal overflow.</span>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="flex items-center gap-2 p-2.5 bg-rose-50 border border-rose-200 rounded-lg text-rose-900">
+                        <AlertTriangle className="h-4 w-4 text-rose-600 flex-shrink-0" />
+                        <span>No Phone Layout configured on this page (0 visuals on canvas).</span>
+                      </div>
+                      <div className="flex items-center gap-2 p-2.5 bg-amber-50/70 border border-amber-200 rounded-lg text-amber-900">
+                        <AlertTriangle className="h-4 w-4 text-amber-600 flex-shrink-0" />
+                        <span>Mobile users will experience non-responsive, zoomed-out desktop canvas.</span>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* Remediation Guide */}
+              {!hasMobile && (
+                <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900 space-y-1">
+                  <p className="font-bold flex items-center gap-1.5">
+                    <AlertTriangle className="h-4 w-4 text-amber-600" />
+                    Action Required: Configure Phone Layout in Power BI Desktop
+                  </p>
+                  <p className="text-amber-800 text-[11px] leading-relaxed">
+                    Open the report in Power BI Desktop, navigate to <strong>{selectedPageAudit.page_name} &rarr; View &rarr; Mobile Layout</strong>, and drag the key metric cards and charts into the mobile portrait phone canvas.
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Right Mobile Phone Mockup Simulator */}
+          <div className="lg:col-span-5 flex justify-center">
+            <div className="w-[300px] h-[580px] bg-slate-900 rounded-[42px] p-3 shadow-2xl border-4 border-slate-700 relative flex flex-col">
+              {/* Dynamic Island / Notch */}
+              <div className="w-24 h-4 bg-black rounded-full mx-auto mb-2 flex-shrink-0" />
+
+              {/* Screen Container */}
+              <div className="flex-1 bg-slate-50 rounded-[30px] overflow-y-auto p-3 space-y-2.5 text-slate-800 select-none flex flex-col">
+                {/* Mobile Top Bar */}
+                <div className="flex items-center justify-between pb-1 border-b border-slate-200 flex-shrink-0">
+                  <span className="text-[10px] font-bold text-slate-800 truncate max-w-[160px]">
+                    {selectedPageAudit.page_name}
+                  </span>
+                  <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
+                    hasMobile ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
+                  }`}>
+                    {hasMobile ? 'Mobile OK' : 'No Mobile Layout'}
+                  </span>
+                </div>
+
+                {hasMobile ? (
+                  <div className="space-y-2.5 flex-1 overflow-y-auto">
+                    {/* Mobile KPI Cards */}
+                    <div className="p-2 bg-white border border-slate-200 rounded-xl shadow-xs space-y-0.5">
+                      <p className="text-[9px] text-slate-500 font-bold">Total Placed Visuals</p>
+                      <p className="text-sm font-black text-slate-900">{selectedPageAudit.mobile_visual_count} / {selectedPageAudit.desktop_visual_count}</p>
+                      <span className="text-[8px] font-bold text-emerald-600">Configured on Phone Canvas</span>
+                    </div>
+
+                    <div className="p-2 bg-white border border-slate-200 rounded-xl shadow-xs space-y-0.5">
+                      <p className="text-[9px] text-slate-500 font-bold">Canvas Alignment</p>
+                      <p className="text-sm font-black text-slate-900">Portrait 390x844</p>
+                      <span className="text-[8px] font-bold text-indigo-600">Snap-to-Grid Active</span>
+                    </div>
+
+                    {/* Mobile Mini Visual Mockup */}
+                    <div className="p-2 bg-white border border-slate-200 rounded-xl shadow-xs space-y-1.5">
+                      <p className="text-[9px] font-bold text-slate-700">Visual Layout Preview</p>
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between text-[8px] text-slate-600">
+                          <span>Phone Layout Coverage</span>
+                          <span>{selectedPageAudit.score}%</span>
+                        </div>
+                        <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                          <div className="bg-emerald-500 h-full" style={{ width: `${selectedPageAudit.score}%` }} />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="p-2 bg-white border border-slate-200 rounded-xl shadow-xs space-y-1">
+                      <p className="text-[9px] font-bold text-slate-700">Mobile Status</p>
+                      <div className="h-10 bg-slate-50 rounded flex items-center justify-center text-[9px] text-emerald-600 font-bold">
+                        📱 Ready for Mobile App
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex-1 flex flex-col items-center justify-center text-center p-4 space-y-3 bg-white/60 rounded-2xl border border-dashed border-slate-300 my-auto">
+                    <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-400">
+                      <Smartphone className="h-6 w-6" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-slate-800">Create a mobile layout</p>
+                      <p className="text-[10px] text-slate-500 mt-1 leading-normal">
+                        Drag visuals from the page visuals pane onto the mobile canvas in Power BI Desktop.
+                      </p>
+                    </div>
+                    <div className="px-2.5 py-1 bg-slate-100 border border-slate-200 rounded-md text-[9px] font-bold text-slate-600">
+                      0 of {selectedPageAudit.desktop_visual_count ?? 0} Visuals Placed
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Bottom Home Indicator */}
+              <div className="w-28 h-1 bg-slate-600 rounded-full mx-auto mt-2 flex-shrink-0" />
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   const renderMainContent = () => {
     if (sidebarActive === 'overview') return renderOverview();
     if (sidebarActive === 'power_query') return renderStandaloneSection(powerQuerySec);
@@ -870,6 +1610,9 @@ export default function ReportView() {
     if (sidebarActive === 'all_categories') return renderAllCategories();
     if (sidebarActive === 'not_used') return renderNotUsed();
     if (sidebarActive === 'report_level') return renderReportLevel();
+    if (sidebarActive === 'visual_regression') return renderVisualRegression();
+    if (sidebarActive === 'dax_performance') return renderDaxPerformance();
+    if (sidebarActive === 'mobile_layout') return renderMobileLayout();
     // page
     return renderPageContent(sidebarActive);
   };

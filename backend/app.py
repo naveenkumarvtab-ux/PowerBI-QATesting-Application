@@ -42,10 +42,12 @@ def create_app():
     from backend.api.routes_pbix import pbix_bp
     from backend.api.routes_service import service_bp
     from backend.api.routes_jobs import jobs_bp
+    from backend.api.routes_admin import admin_bp
     
     app.register_blueprint(pbix_bp)
     app.register_blueprint(service_bp)
     app.register_blueprint(jobs_bp)
+    app.register_blueprint(admin_bp)
     
     @app.route('/api/health', methods=['GET'])
     def health_check():

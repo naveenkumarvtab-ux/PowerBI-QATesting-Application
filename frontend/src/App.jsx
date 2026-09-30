@@ -8,6 +8,7 @@ import ServiceTest from './pages/ServiceTest';
 import JobStatus from './pages/JobStatus';
 import ReportView from './pages/ReportView';
 import History from './pages/History';
+import AdminPortal from './pages/AdminPortal';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import ForgotPassword from './pages/ForgotPassword';
@@ -43,6 +44,7 @@ export default function App() {
           <Route path="/jobs/:jobId/status" element={<JobStatus />} />
           <Route path="/jobs/:jobId/report" element={<ReportView />} />
           <Route path="/history" element={<History />} />
+          <Route path="/admin" element={<AdminPortal />} />
         </Route>
       </Routes>
     </Router>

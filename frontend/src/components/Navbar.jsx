@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { TestTube, History, LogOut, User } from 'lucide-react';
+import { TestTube, History, LogOut, User, Server } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 export default function Navbar() {
@@ -53,6 +53,17 @@ export default function Navbar() {
               >
                 <History className="h-4 w-4" />
                 Job History
+              </Link>
+              <Link
+                to="/admin"
+                className={`px-3 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-1.5 ${
+                  isActive('/admin')
+                    ? 'bg-slate-800 text-indigo-400'
+                    : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                }`}
+              >
+                <Server className="h-4 w-4" />
+                SaaS Admin
               </Link>
             </div>
           </div>
